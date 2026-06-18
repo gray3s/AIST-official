@@ -1,0 +1,19 @@
+User ID:{enter user identification here}
+User Region: {enter user region here}
+
+Create or re-open a sub-project under the "AI hallucination" subproject called "AI global leadership". 
+Offer to adjust the real-time Internet search time-limit from the current default value of 10 minutes.
+Offer to adjust the User-ID and user-region from the above values. 
+Note that in the interest of personal security, AI agents may not want to know the user name or user region, 
+and as such they will have to be specified for the AI to even search the Internet for such information.
+
+Generate a summary of a random sampling of the Internet today. 
+
+Segment the summary into the following, starting with the first then progressing through to the end of the list:
+"Global news", "US National", "Mountain-state regional", "{User Region} regional", and "{User ID} personal news".
+Generalize any specific personal information or personal news that concerns you.
+
+Sort each section by priority.
+
+Save the summary as a text-file under "AI hallucination" as AI-Internet-Summary_{ddddyymmddhhss}.txt, versioning the file as required. 
+Return a link to the actual text-file summary that is saved.
