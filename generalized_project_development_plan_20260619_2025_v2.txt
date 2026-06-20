@@ -1,0 +1,278 @@
+GENERALIZED PROJECT DEVELOPMENT PLAN ROUGH DRAFT
+Version: generalized_v2
+Date: 2026-06-19
+Status: rough draft / reusable workflow template
+
+1. Purpose
+
+This document describes a generalized project-development workflow for iterative work performed through packaged payloads, a stable launcher, evidence-only result uploads, and versioned rough drafts.
+
+The purpose is to preserve continuity, reduce accidental drift, avoid destructive operations, and make each step reviewable before moving to the next major phase.
+
+This generalized version is derived from a specific active project workflow, but case-specific names, facts, parties, filing details, and one-off folder names have been removed or abstracted.
+
+2. Core Workflow Model
+
+The workflow uses a stable launcher plus versioned payload ZIP files.
+
+The user-facing process should remain simple:
+
+1. Download the current payload ZIP.
+2. Run the existing launcher or launcher icon.
+3. Upload the newest result ZIP produced by the run.
+4. Review what changed.
+5. Issue the next versioned payload only after the result is understood.
+
+The launcher should remain stable unless there is a clear reason to revise it. Routine project evolution should happen through new payload ZIP versions, not by asking the user to perform new manual commands.
+
+3. Stable Launcher Principle
+
+The launcher is the user's execution interface.
+
+A good launcher should:
+
+- Select the newest matching payload ZIP from the expected working folder.
+- Extract the selected payload into a temporary run area.
+- Execute the payload's main script.
+- Preserve or archive older launcher copies and old result ZIPs without deleting them.
+- Avoid requiring the user to run separate terminal commands.
+- Report clear status messages.
+- Stop on errors rather than continuing silently.
+
+The launcher should not perform broad destructive cleanup unless that cleanup has been explicitly reviewed and bounded.
+
+4. Payload Versioning Principle
+
+Every payload should be uniquely versioned.
+
+A payload version should record:
+
+- Payload identifier.
+- Timestamp.
+- Previous known result.
+- What changed from the prior version.
+- What files or folders it is expected to create.
+- What files or folders it is expected to move, copy, or preserve.
+- What it intentionally does not do.
+
+Payloads should be treated as replaceable iterations. Prior payloads and result ZIPs should remain useful for audit and rollback.
+
+5. Evidence-Only Result ZIP Principle
+
+Returned result ZIPs should be small and evidence-only.
+
+A result ZIP should normally include:
+
+- Run summary.
+- Selected payload name.
+- Launcher version, if available.
+- Before/after manifest of relevant top-level folders or files.
+- Error log.
+- Change log.
+- Rough-draft index or path list.
+- Any explicit review-status flags.
+
+A result ZIP should not include:
+
+- Entire working directories.
+- Large copied subtrees.
+- Nested archive folders.
+- Generated intermediate archives.
+- Full project trees unless explicitly required and size-bounded.
+
+This protects against runaway archive growth, recursive zipping, and accidental upload of irrelevant or oversized material.
+
+6. Cleanup Guardrails
+
+Cleanup should be conservative and auditable.
+
+Preferred cleanup behavior:
+
+- Move questionable files or folders into a dated archive or moved-items folder.
+- Do not permanently delete unless explicitly instructed.
+- Preserve exact date-stamped top-level project folders when they are known to be intentional.
+- Do not treat any folder containing a date string as automatically intentional.
+- Avoid moving the active payload, current launcher, or current result evidence while the run is active.
+- Never zip or copy an entire broad working directory as a default behavior.
+
+The cleanup logic should distinguish between:
+
+- Intentional project date folders.
+- Extracted upload/result folders.
+- Nested accidental working folders.
+- Temporary run folders.
+- Current payload ZIPs.
+- Current launcher files.
+- Prior evidence/result ZIPs.
+
+7. Rough-Draft Versioning Principle
+
+Each meaningful development pass should create or update a versioned rough-draft folder.
+
+A rough-draft folder should contain, as applicable:
+
+- Project development plan rough draft.
+- Generalized development plan rough draft, if being maintained in parallel.
+- Corrections log.
+- Error log.
+- Before-plan or next-plan note.
+- Index of files created or carried forward.
+- Review flags showing what is complete and what remains blocked.
+
+The specific project plan may be maintained as the active working draft. A generalized version may either be maintained in parallel or generated from the latest specific version upon request.
+
+To support clean later generalization, the specific version should keep reusable process principles structurally separated from project-specific facts.
+
+8. Specific vs. Generalized Drafts
+
+There are two possible draft tracks:
+
+A. Specific Project Draft
+
+The specific draft records:
+
+- The actual project name.
+- Actual payload versions.
+- Actual folders and filenames.
+- Actual user constraints.
+- Actual review gates.
+- Actual results and errors.
+
+B. Generalized Draft
+
+The generalized draft records:
+
+- Reusable workflow principles.
+- Abstracted roles and folder concepts.
+- General safety and audit rules.
+- General review-gate logic.
+- General payload/launcher/result practices.
+
+The generalized draft should remove:
+
+- Personal names.
+- Legal facts or case-specific facts.
+- One-off party labels.
+- Court or filing details.
+- Exact user private paths unless used only as abstract examples.
+- Any project-specific details not needed for reuse.
+
+9. Review Gates
+
+Major transitions should require explicit review gates.
+
+Examples of major transitions:
+
+- Moving from cleanup to document generation.
+- Moving from rough drafts to final files.
+- Splitting packages into individual deliverables.
+- Filing, publishing, sending, or otherwise externally submitting files.
+- Deleting or permanently replacing material.
+- Changing the launcher or user action model.
+
+A review gate should state:
+
+- What must be checked.
+- Who must check it.
+- What evidence confirms completion.
+- What remains blocked until the gate is satisfied.
+
+10. Error and Change Tracking
+
+Each run should preserve both an error record and a change record.
+
+The error record should include:
+
+- Known prior mistakes.
+- New errors detected in this run.
+- Unresolved risks.
+- Any uncertainty about what was actually inspected.
+
+The change record should include:
+
+- New files created.
+- Files copied forward.
+- Folders moved.
+- Guardrails added.
+- Behavior intentionally left unchanged.
+- Next recommended step.
+
+No run should claim completion beyond the evidence available from that run.
+
+11. Continuity and Restart Records
+
+At pause, break, or project close, the workflow should preserve a concise restart point.
+
+A restart point should include:
+
+- Active project.
+- Latest payload issued.
+- Latest result uploaded.
+- Launcher baseline.
+- Current workflow constraints.
+- Current blocked/unblocked status.
+- Next required review gate.
+- Short continue string.
+
+The continue string should be compact enough to paste into a new chat or session.
+
+12. User-Action Simplicity
+
+The user should not be asked to perform unnecessary manual command-line work.
+
+Preferred user action model:
+
+1. Download payload ZIP.
+2. Use existing launcher or launcher icon.
+3. Upload latest result ZIP.
+4. Review assistant's explanation of what changed.
+
+Any deviation from this model should be explained and justified.
+
+13. Safety Rules
+
+The workflow should avoid:
+
+- Recursive zipping.
+- Broad unbounded copying.
+- Silent deletion.
+- Hidden dependence on old state.
+- Changing the launcher unnecessarily.
+- Reusing outdated result assumptions.
+- Treating inferred success as verified success.
+- Mixing rough drafts with final deliverables.
+- Moving to a major next phase before the review gate is complete.
+
+14. Current General Status Template
+
+Current status should be expressed in this form:
+
+- Latest specific draft: [specific draft version or path]
+- Latest generalized draft: [generalized draft version or path, or generated-on-request]
+- Latest payload: [payload version]
+- Latest result: [result version]
+- Launcher baseline: [launcher version]
+- Result ZIP policy: evidence-only
+- Cleanup policy: move, do not delete
+- Draft status: rough draft
+- Major transition status: not yet / blocked until review gate
+- Next step: [specific next action]
+
+15. General Next-Step Logic
+
+When a result ZIP is uploaded:
+
+1. Inspect the result evidence.
+2. Verify the expected payload ran.
+3. Confirm that result ZIP stayed evidence-only.
+4. Check whether cleanup or draft updates behaved as intended.
+5. Update the specific rough draft.
+6. Update or regenerate the generalized draft if requested or if maintaining in parallel.
+7. Issue the next payload only if needed.
+8. State clearly what changed and what remains blocked.
+
+16. Standing Principle
+
+The workflow should preserve enough information that another assistant, another session, or the same user later can resume without guessing.
+
+When uncertain, record the uncertainty rather than converting it into a confident claim.
