@@ -1,0 +1,103 @@
+As of July 2026, I’d frame them this way:
+
+Codex
+Codex is strongest as a software-engineering agent that works directly inside a repo: reads files, edits code, runs commands, tests, uses patches, respects sandboxing/permissions, and can operate through CLI, IDE, web, app, GitHub/Slack/Linear integrations, and automation surfaces. OpenAI’s docs position Codex around app, IDE extension, CLI, web, GitHub, Slack, Linear, workflows, sandboxing, subagents, and automation. Source: https://developers.openai.com/codex/
+
+Best for: repo-level implementation, debugging, test-driven fixes, code review, patching existing systems, and controlled command-line work.
+
+Tradeoff: it feels more like an engineering coworker in a terminal/workspace than a pure IDE autocomplete tool. For tight “while I type” coding flow, Cursor may feel more immediate.
+
+Claude / Claude Code
+Claude Code is Anthropic’s agentic coding tool. Anthropic describes it as able to read a codebase, edit files, run commands, and integrate with development tools, available in terminal, IDE, desktop app, and browser. Source: https://docs.anthropic.com/en/docs/claude-code/overview
+
+Best for: long-form reasoning, codebase explanation, careful refactors, debugging across many files, and conversational planning. Claude often feels strong when you want a lot of architectural thinking or prose-quality analysis alongside code changes.
+
+Tradeoff: depending on setup, permissions, and model behavior, it may feel more “consultative” or verbose. The quality can be excellent, but workflow fit depends heavily on whether you prefer terminal agent work, IDE work, or chat-style iteration.
+
+Cursor
+Cursor is primarily an AI-native code editor. Its strongest advantage is integration into the editing loop: autocomplete, inline edits, command-based changes, chat/agent workflows, cloud agents, CLI, and model choice across OpenAI, Anthropic, Gemini, xAI, and Cursor models. Cursor describes agents that can work autonomously, run in parallel, build/test/demo features, plus “Tab” and targeted edit workflows. Source: https://cursor.com/features
+
+Best for: day-to-day coding inside an editor, fast autocomplete, small-to-medium edits, navigating code, making targeted changes while you remain hands-on.
+
+Tradeoff: because it is editor-centered, it can encourage fast local changes more than deliberate repo-wide task execution. It is excellent for flow; for auditability and controlled terminal workflows, Codex-style operation can be cleaner.
+
+Short Version
+
+Tool | Core Identity | Best At
+--- | --- | ---
+Codex | Engineering agent in a repo/workspace | Implementing, testing, patching, reviewing
+Claude Code | Reasoning-heavy coding agent | Explanation, architecture, refactors, complex reasoning
+Cursor | AI-first IDE/editor | Autocomplete, inline edits, daily coding flow
+
+My practical take: use Cursor when you want to stay in the editor and move fast; use Codex when you want an agent to handle a repo task end-to-end with shell/test awareness; use Claude when the hard part is understanding, planning, or reasoning through a messy system.
+
+AI Hallucination Tendency - Informed Estimate
+
+Important caveat: these ranges are not formal benchmark results. They are informed estimates for practical software-development use, based on how these tools are typically used, how much grounding they can get from the local repo/tooling, and how strongly their workflow encourages verification.
+
+Estimated hallucination tendency means: the chance that a materially important claim, explanation, code assumption, API detail, or diagnosis is invented, stale, overconfident, or insufficiently grounded during normal development use.
+
+Tool | Estimated Lower Bound | Estimated Upper Bound | Practical Center of Gravity
+--- | --- | --- | ---
+Codex | 5% | 25% | Lower when allowed to inspect files, run tests, and cite concrete command output; higher when asked broad factual questions without browsing or repo context.
+Claude Code | 7% | 30% | Lower when constrained to the codebase and asked to reason from visible files; higher in speculative architecture, library/version claims, or long explanations without verification.
+Cursor | 8% | 35% | Lower for local inline edits with visible context; higher when autocomplete or agent changes infer unseen project behavior, dependencies, or intent from partial editor context.
+
+Codex hallucination factors:
+- Skews toward the low end when it can read the actual repository, use search, run tests/builds, inspect command output, and produce patches tied to files.
+- Skews toward the high end when it cannot access the relevant files, is denied commands needed for verification, is asked about fast-changing external facts without browsing, or is forced to infer project intent from sparse prompts.
+- Its sandboxing, patch workflow, and command output grounding can reduce hallucination, but they do not eliminate bad assumptions.
+
+Claude Code hallucination factors:
+- Skews toward the low end when the task is codebase-grounded and the answer is anchored to files, terminal output, or explicit user-provided context.
+- Skews toward the high end when the task rewards broad narrative reasoning, architectural speculation, undocumented API behavior, legal/medical/financial claims, or unstated business requirements.
+- Claude’s strength in fluent reasoning can be a double-edged factor: explanations may sound coherent even when a premise needs verification.
+
+Cursor hallucination factors:
+- Skews toward the low end for small, local edits where the relevant file is open, surrounding symbols are visible, and the user is actively reviewing changes.
+- Skews toward the high end when relying on autocomplete, partial project indexing, generated code across files, or agentic edits without running tests.
+- Cursor’s speed and editor proximity are strengths, but they can make unverified suggestions feel like part of the normal coding flow unless the user deliberately reviews and tests them.
+
+Cross-tool rule of thumb:
+- Lowest hallucination risk: visible source files + explicit requirements + local tests/builds + current official docs for external APIs.
+- Highest hallucination risk: vague goals + missing files + stale dependency knowledge + no command execution + no source citations + pressure to answer quickly.
+
+Practical mitigation:
+- Ask the tool to cite files, line numbers, command outputs, or official docs.
+- Prefer small patches over giant rewrites.
+- Run tests or at least type checks after code changes.
+- Treat confident claims about current product features, prices, laws, API versions, or package behavior as unverified until checked against primary sources.
+- For agentic coding, require an explicit summary of assumptions and verification performed.
+
+Codex Self-Tracking of AI Hallucinations - Informed Estimate
+
+Important caveat: I do not have a perfect internal hallucination detector. I can track evidence, assumptions, uncertainty, command results, file references, and later corrections, but I cannot reliably know in the moment that a false statement is false unless I verify it against a source or a tool result.
+
+Estimated ability to track and log my own hallucinations:
+
+Category | Estimated Lower Bound | Estimated Upper Bound | Practical Center of Gravity
+--- | --- | --- | ---
+Detecting uncertainty before answering | 60% | 90% | Strong when the claim depends on current facts, external products, legal/financial/medical issues, or unseen files; weaker when a false premise feels familiar.
+Preventing hallucinations through verification | 70% | 95% | Strong when allowed to browse, inspect files, run commands, and cite outputs; much weaker when restricted to memory or when verification is skipped.
+Detecting a hallucination after producing it | 35% | 80% | Strong when later evidence contradicts the claim; weak when no follow-up check occurs.
+Logging hallucination risk explicitly | 75% | 95% | Strong when asked to document assumptions, sources, and verification; lower if the task is casual and no logging format is requested.
+Automatically maintaining a complete hallucination audit trail | 20% | 60% | Limited unless the workflow explicitly requires a written assumptions/errors log or the environment records the full interaction and tool outputs.
+
+Factors that improve self-tracking:
+- Explicit requirement to label assumptions, uncertainty, and verification status.
+- Use of primary sources, local files, command output, tests, and reproducible checks.
+- Small task increments with readback, review, and correction loops.
+- A dedicated log file for claims, sources, confidence, and later corrections.
+- User challenges or requests for citations when a claim sounds too confident.
+
+Factors that weaken self-tracking:
+- Answering from memory about fast-changing products, prices, laws, APIs, or software versions.
+- Long, broad narrative answers with many factual claims.
+- No access to files, internet, tests, or command execution.
+- Ambiguous prompts where I silently fill in missing context.
+- Fluent explanations that make an unverified inference sound established.
+
+Practical estimate:
+- If I am required to verify and log claims as I go, I can keep hallucination tracking reasonably strong, roughly in the 75%-90% range for software-development tasks.
+- If I am answering casually from memory without sources or tests, my ability to track my own hallucinations drops substantially, roughly into the 35%-65% range.
+- The safest workflow is to treat my confidence labels as useful but insufficient, and to pair them with source links, file references, command output, and test results.
