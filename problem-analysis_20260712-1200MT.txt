@@ -871,3 +871,84 @@ The important move is to classify the disturbance at the right abstraction level
 - the generalized failure mode, so it can be counted statistically.
 
 That is how the problem-analysis file can become more than a transcript. It can become the seed of a taxonomy for human-agent program-flow reliability.
+
+
+User Prompt 10:
+I like your input on examples of "hallucination" but I think that it should be noted that there is significant interplay among the numbered examples that you'ev mentioned. For example it is a long-established fact that QA tests can fail despite having actually been run, for the simple reason that the tests are insufficient to confirm the result. QA tests must cover all possible inputs and outputs, and clarly define the pass or fail result associated with them. Then of course they should also give the justification for the pass/fail result. .
+
+Assistant Response 10:
+Yes. The numbered categories should not be treated as isolated boxes. They interact.
+
+A factual error can come from a scope error. A scope error can come from an omission. An omission can come from an unstated assumption. A bad assumption can be reinforced by weak testing. A weak test can then produce a false factual claim such as "verification passed."
+
+That means HybridAI should distinguish between:
+
+```text
+test_was_run
+test_passed
+test_actually_verifies_the_claim
+test_scope_is_sufficient
+test_result_is_justified
+```
+
+Those are different claims. Codex and other agents can hallucinate by collapsing them into one statement.
+
+For example, the statement "tests pass" may be technically true and still misleading if the tests do not cover the behavior being claimed. In that case, the hallucination is not the raw test result. The hallucination is the unsupported inference from a limited test result to a broader verification claim.
+
+QA itself has a scope problem:
+
+- What inputs are covered?
+- What outputs are expected?
+- What edge cases are included?
+- What failure modes are excluded?
+- What oracle decides pass or fail?
+- What justifies that oracle?
+- What claim does this test actually support?
+- What claim does this test not support?
+
+For agentic-AI reliability, the final summary should therefore avoid vague verification claims. It should say something closer to:
+
+```text
+Verification run:
+- Command: <command>
+- Result: pass/fail/error
+- Covered claim: <specific behavior checked>
+- Not covered: <important uncertainty that remains>
+- Justification: <why this result supports or fails to support the claim>
+```
+
+This changes how hallucination should be tracked. A verification hallucination can occur at several layers:
+
+1. The agent falsely claims a test was run.
+2. The agent misreports the test output.
+3. The agent reports a pass but ignores warnings or partial failures.
+4. The agent treats an irrelevant test as relevant.
+5. The agent treats a narrow test as broad proof.
+6. The agent fails to explain what the test does and does not establish.
+
+The fifth case is especially important. It is a scope hallucination expressed as a QA claim.
+
+So the taxonomy should include interaction effects. A single incident may need multiple tags:
+
+```text
+event_tags = [
+  "verification_claim",
+  "insufficient_test_scope",
+  "unsupported_inference",
+  "overbroad_success_claim"
+]
+```
+
+That is better than forcing the incident into one category. In real work, the dangerous failures are often compound failures: a small omission plus a hidden assumption plus an overbroad success claim.
+
+The practical standard for HybridAI should be:
+
+> Verification is not the act of running a test. Verification is the justified connection between the test, its coverage, its pass/fail rule, and the specific claim being made.
+
+That also means a good agent should be able to say:
+
+```text
+I ran the available test, and it passed, but that test does not fully verify the requested behavior.
+```
+
+That sentence is a reliability feature. It prevents "tests passed" from becoming another form of hallucination.
