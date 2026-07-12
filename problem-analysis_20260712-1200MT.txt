@@ -1012,3 +1012,63 @@ The practical standard should be:
 > A project-development plan is not reliable because it is detailed. It is reliable only when its goals, milestones, tests, and success claims are tied to evidence and can be revised when that evidence changes.
 
 So yes: irrational goal development and irrational project planning should be tracked as human/operator hallucinations or project-flow disturbances when they cause the work to move away from the best-supported path.
+
+
+User Prompt 12:
+..and that one clear example of irrational development is failing to listen to client needs and map the project from that input to the solution.
+
+Assistant Response 12:
+Yes. That is a concrete and important example of irrational project development.
+
+If a project does not listen to client needs, it breaks the evidence chain at the first step. The client's needs are not a decorative input. They are primary project evidence. A development plan that skips, distorts, or prematurely abstracts that input can look organized while solving the wrong problem.
+
+The rational mapping should be explicit:
+
+```text
+client need
+  -> interpreted requirement
+  -> confirmed requirement
+  -> design constraint
+  -> implementation choice
+  -> verification method
+  -> client-meaningful success criterion
+```
+
+The irrational version looks like this:
+
+```text
+assumed need
+  -> preferred solution
+  -> retrofitted justification
+  -> activity mistaken for progress
+```
+
+That is a project-level hallucination. The project asserts that it is solving the client's problem without maintaining a justified connection between the client's actual input and the chosen solution.
+
+For HybridAI, this matters in two directions:
+
+1. Human project planning.
+   The human operator must not impose a solution architecture that ignores the actual problem being developed.
+
+2. Agent behavior.
+   The agent must not convert a user's request into an almost-related task and then report progress as if it followed the actual need.
+
+This should be tracked as a client-need mapping failure:
+
+```text
+client_need_mapping_failure =
+the project or agent fails to preserve a traceable path from stated need
+to requirement, design, implementation, verification, and success claim
+```
+
+Useful audit questions:
+
+1. What did the client/user actually ask for?
+2. What need does that request imply?
+3. Did the actor confirm the interpretation before building around it?
+4. What requirement was derived from the need?
+5. What solution choice maps directly to that requirement?
+6. What verification proves that the need was met?
+7. What was assumed rather than confirmed?
+
+This is one of the most common ways projects become irrational: they preserve the appearance of development while losing contact with the originating need.
