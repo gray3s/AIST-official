@@ -1133,6 +1133,9 @@ Yes. "Better than nothing" is a weak justification, and for agentic-AI it can be
 
 The phrase may be true in a narrow sense: a flawed tool may produce some useful output where no tool would produce none. But that does not establish that the tool is appropriate, reliable, safe, cost-effective, or rationally justified for the task.
 
+Process Addendum:
+HybridAI should treat "better than nothing" as an insufficient process justification. It is a comparison against absence, not a comparison against the actual needs, risks, and standards of the project.
+
 For HybridAI, "better than nothing" should be treated as an adequacy-claim warning sign:
 
 ```text
@@ -1165,3 +1168,12 @@ So the standard should be:
 > A tool is not justified because it is better than nothing. It is justified when its benefits exceed its verification burden, risk, opportunity cost, and project-flow disturbance for the actual task.
 
 This belongs in the hallucination discussion because "better than nothing" can become another unsupported adequacy claim. It lets the agent or operator avoid proving that the tool is good enough in the ways that matter.
+
+As an overall process rule:
+
+```text
+do_not_accept_better_than_nothing =
+do not justify an agent, workflow, project plan, or development decision merely
+because it is better than having no option; require evidence that it satisfies
+the task's reliability, verification, client-need, and project-flow standards
+```
