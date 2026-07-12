@@ -1123,3 +1123,45 @@ For HybridAI, the corrective standard should be:
 > A solution is not rationally successful unless the agent can show how the user's actual need was interpreted, scoped, implemented, verified, and tied back to a client-meaningful success criterion.
 
 That makes user-need traceability part of hallucination control. Without it, the agent can "solve" the task in appearance while failing the project in substance.
+
+
+User Prompt 14:
+like "saying that it's better than nothing" is not exactly a good justification for using it. (add that also)
+
+Assistant Response 14:
+Yes. "Better than nothing" is a weak justification, and for agentic-AI it can become actively misleading.
+
+The phrase may be true in a narrow sense: a flawed tool may produce some useful output where no tool would produce none. But that does not establish that the tool is appropriate, reliable, safe, cost-effective, or rationally justified for the task.
+
+For HybridAI, "better than nothing" should be treated as an adequacy-claim warning sign:
+
+```text
+better_than_nothing_claim =
+a justification that compares the agent only against the absence of assistance,
+instead of comparing it against the actual reliability, verification, cost,
+risk, and client-need requirements of the project
+```
+
+The relevant question is not:
+
+```text
+Is this better than having no tool?
+```
+
+The relevant questions are:
+
+1. Is this tool reliable enough for the task?
+2. Does it preserve the evidence chain?
+3. Does it reduce project-flow disturbance or create new disturbance?
+4. Are its errors detectable at acceptable cost?
+5. Does it meet the user's actual need?
+6. Is there a better workflow, even if less flashy?
+7. Does using it train the operator to accept lower standards?
+
+"Better than nothing" can also conceal opportunity cost. A tool that is marginally useful but creates hidden verification burden may be worse than a simpler, slower, more reliable workflow.
+
+So the standard should be:
+
+> A tool is not justified because it is better than nothing. It is justified when its benefits exceed its verification burden, risk, opportunity cost, and project-flow disturbance for the actual task.
+
+This belongs in the hallucination discussion because "better than nothing" can become another unsupported adequacy claim. It lets the agent or operator avoid proving that the tool is good enough in the ways that matter.
