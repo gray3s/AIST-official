@@ -1,0 +1,703 @@
+Problem Analysis: Agentic-AI Hallucination, Reliability, and Tool Justification
+Timestamp: 2026-07-12 12:00 MT
+Location: hybridAI v1 misc notes
+
+User Prompt 1:
+well today I have one overarching question. How can we identify when and how (statistically) codex and other agentic-AI implementaitons "hallucinate" and and use that data to analyze the agentic-AI implementations design and even improve upon them? because if I can't prove that Codex is a bad tool or that it cannot be improved upon by independent developers outside of OpenAI, then how can I justify not using it?
+
+Assistant Response 1:
+You can justify using or not using Codex only if you measure it against the work you actually need done. The right frame is not "does it hallucinate?" but:
+
+> Under what task conditions does this agent produce unsupported, incorrect, or unverifiable outputs, how often, how severely, and can the failure rate be reduced by better design?
+
+That can be studied pretty rigorously.
+
+Define Hallucination Operationally
+
+For agentic coding tools, "hallucination" should not just mean "made something up." Break it into measurable categories:
+
+1. False factual claim
+   Example: claims a file, API, dependency, command output, or behavior exists when it does not.
+
+2. Unsupported inference
+   Example: says "the tests pass" without running them, or infers system behavior from naming alone.
+
+3. Invalid tool-use result
+   Example: misreads terminal output, fabricates command results, ignores errors, or reports a file was edited when it was not.
+
+4. Spec deviation
+   Example: implements something plausible but different from the requested behavior.
+
+5. Overconfident uncertainty
+   Example: presents a guess as fact instead of saying "I need to inspect this."
+
+6. Non-reproducible solution
+   Example: code works only in the agent's imagined environment, not in the real repo.
+
+For Codex-like agents, the most important hallucination class is probably not "fake trivia." It is unearned certainty about local state.
+
+Measure It Like an Engineering Problem
+
+You need a task corpus. For example:
+
+- 50 bug fixes
+- 50 feature additions
+- 50 refactors
+- 50 test-writing tasks
+- 50 repo-navigation/explanation tasks
+
+Each task should have:
+
+- initial repo state
+- user prompt
+- expected outcome or grading rubric
+- allowed tools
+- time/token budget
+- ground-truth checks where possible
+
+Then run each agent multiple times per task, because stochastic systems need repeated trials.
+
+Useful metrics:
+
+```text
+hallucination_rate = hallucinated_claims / total_verifiable_claims
+
+task_failure_rate = failed_tasks / total_tasks
+
+silent_failure_rate = failures_reported_as_success / total_tasks
+
+unsupported_success_claim_rate = success_claims_without_verification / success_claims
+
+tool_misread_rate = incorrect_interpretations_of_tool_output / tool_outputs_used
+
+spec_deviation_rate = materially_wrong_implementations / total_tasks
+
+repair_rate = failures_fixed_after_feedback / initial_failures
+```
+
+The most damning metric is usually silent failure rate: cases where the agent says the task is done but it is not.
+
+Instrument The Agent
+
+To analyze design, log every step:
+
+- prompt
+- model response
+- tool calls
+- command outputs
+- file diffs
+- tests run
+- final claims
+- whether each final claim is supported by evidence
+- whether the repo actually works after the change
+
+Then classify failures by cause:
+
+```text
+Context failure:
+Agent did not inspect enough relevant files.
+
+Reasoning failure:
+Agent had the facts but drew the wrong conclusion.
+
+Tool-use failure:
+Agent ran the wrong command, ignored output, or misread results.
+
+Planning failure:
+Agent chose a bad sequence of actions.
+
+Verification failure:
+Agent did not test or tested the wrong thing.
+
+Instruction-following failure:
+Agent ignored user constraints or repo conventions.
+
+Memory/state failure:
+Agent contradicted earlier observed facts.
+```
+
+That classification is what lets you improve the design.
+
+Use Statistical Comparisons
+
+You can compare Codex against other agents or against modified wrappers.
+
+For example:
+
+- Codex baseline
+- Codex with stricter verification prompts
+- Codex with enforced test-running
+- Codex with claim/evidence auditing
+- another coding agent
+- human baseline, if practical
+
+Then compare:
+
+- completion rate
+- hallucination rate
+- silent failure rate
+- average time
+- average cost
+- severity-weighted defect rate
+
+Use confidence intervals, not just averages. A simple result might look like:
+
+```text
+Agent A:
+Task success: 72% +/- 6%
+Silent failure: 18% +/- 5%
+
+Agent B:
+Task success: 68% +/- 7%
+Silent failure: 7% +/- 3%
+```
+
+Even if Agent A completes more tasks, Agent B may be preferable if silent failure is much lower.
+
+Severity Matters
+
+Not all hallucinations are equal. Weight them.
+
+Example scale:
+
+```text
+1 = harmless wording issue
+2 = minor incorrect claim, easily caught
+3 = causes wasted debugging time
+4 = introduces broken code or bad legal/financial/medical reasoning
+5 = reports success while producing dangerous or materially wrong output
+```
+
+Then measure:
+
+```text
+severity_weighted_hallucination_score =
+sum(hallucination_count_by_severity * severity_weight)
+```
+
+This is more useful than raw hallucination count.
+
+How This Improves Agent Design
+
+Once you have failure data, you can improve the agent in specific ways:
+
+- If failures come from insufficient repo inspection: require search/read steps before edits.
+- If failures come from false success claims: require tests or explicit "not verified" language.
+- If failures come from tool misreads: add output parsers and structured result summaries.
+- If failures come from spec drift: add acceptance criteria extraction before implementation.
+- If failures come from overbroad edits: add diff-size limits and localized change policies.
+- If failures come from weak recovery: add post-failure diagnosis loops.
+
+Independent developers can absolutely improve the agentic wrapper, even if they cannot change the base model. The wrapper controls planning, tool access, memory, verification, retry policy, diff review, test selection, and final reporting. Those are huge parts of actual agent quality.
+
+The Practical Answer
+
+You do not need to prove "Codex is bad." You need to prove one of these:
+
+1. Codex has an unacceptable silent failure rate for your use case.
+2. Codex is less reliable than another workflow under the same conditions.
+3. Codex requires too much verification overhead to be cost-effective.
+4. A modified independent agentic design measurably reduces failures.
+5. Codex is useful, but only inside a constrained workflow with audits and tests.
+
+That last possibility matters. The honest conclusion may be:
+
+> Codex is not a bad tool, but unconstrained Codex is not reliable enough for high-stakes autonomous work. It becomes useful when treated as a fast junior implementer whose claims require evidence.
+
+That is a defensible position. It gives you a way to justify using it, limiting it, replacing it, or building something better.
+
+
+User Prompt 2:
+...even if its competitors offer mmore features that seem to be worth having, if they are fundamentally "logically unreliable" then they are an inherent problem in their system.
+
+Assistant Response 2:
+Yes. Feature count is secondary if the system is logically unreliable in ways that are hard to detect.
+
+But the key is to define "logically unreliable" narrowly enough that it can be tested. For agentic AI, I'd frame it as:
+
+> The system produces conclusions, actions, or success reports that do not follow from the evidence available to it, and it fails to mark those conclusions as uncertain.
+
+That is the real danger. Not that it makes mistakes. All tools make mistakes. The problem is unbounded confidence without a reliable grounding mechanism.
+
+A competitor can have more features:
+
+- longer context
+- browser automation
+- memory
+- app integrations
+- multi-agent workflows
+- prettier UI
+- autonomous task queues
+
+But if it cannot reliably distinguish:
+
+- what it observed
+- what it inferred
+- what it guessed
+- what it verified
+- what remains unknown
+
+then every extra feature increases the blast radius.
+
+The fundamental design question is not "how many things can the agent do?" It is:
+
+```text
+Can the agent maintain a trustworthy chain from evidence -> reasoning -> action -> verification -> claim?
+```
+
+If not, the system has a structural reliability problem.
+
+That does not mean such tools are useless. It means they should be used under constraints:
+
+- no unsupervised high-stakes actions
+- mandatory tool evidence for factual claims
+- explicit uncertainty labels
+- reproducible verification steps
+- logs that let a human audit decisions
+- tests or external checks before success is declared
+- refusal to claim completion when completion was not verified
+
+So your argument can be:
+
+> A richer agentic AI system is not necessarily better. If its planning and reporting layer is not epistemically disciplined, more autonomy and more integrations may simply create more ways to act on false premises.
+
+That is a strong and defensible critique.
+
+The thing to avoid is claiming "Codex is bad" or "competitors are bad" abstractly. The stronger claim is:
+
+> Any agentic AI implementation that cannot statistically demonstrate low rates of unsupported claims, false success reports, and unrecoverable reasoning failures should not be trusted merely because it has more features.
+
+That puts the burden in the right place: measured reliability, not marketing capability.
+
+
+User Prompt 3:
+then we need to clarify the hybridai project goals. That would be to create an agentic-AI with two important characteristics. #1 it would have to at least challenge Codex on the AI hallucination issue. #2 it would have to be local. #3 it would have to continue to display #1 and #2 with time (i.e. it would have to be maintainable on both issues). Without all of these characteristics it wouldn't be worth further development except as perhaps a benchmark by which to measure agentic-AI agent development and evolution over time. But I have real problems even detecting Codex hallucination. Tracking it is one thing once I detect it but even there I have problems because it is not always severe enough to warrant an effort to note and track it. If AI hallucination is "liveable" then humans will get overly used to it and just consider it to be quirk of AI.
+
+Assistant Response 3:
+HybridAI should be defined as an attempt to create an agentic-AI system with three non-negotiable characteristics:
+
+1. It must at least challenge Codex on hallucination and logical reliability.
+2. It must be local, not dependent on a cloud-authenticated agent as the runtime default.
+3. It must continue to satisfy the first two requirements over time, which means the reliability and locality properties must be maintainable.
+
+If HybridAI cannot satisfy all three characteristics, then its value changes. It may still be useful, but mainly as a benchmark and observation platform for measuring agentic-AI development and evolution over time, not as a replacement agent worth continued product-style development.
+
+This makes hallucination detection itself part of the problem. A hallucination that is obvious and severe is relatively easy to record. The harder class is the low-grade, "livable" hallucination:
+
+- A small unsupported claim.
+- A plausible but unverified inference.
+- A mistaken statement about local repo state.
+- A success claim that is mostly right but not fully evidenced.
+- A tool-use omission that the user can work around.
+
+Those incidents may not feel worth recording one by one, but they can still matter statistically and behaviorally. If users become accustomed to small hallucinations, they may normalize them as an unavoidable quirk of AI. That normalization is dangerous because it shifts the burden of epistemic discipline from the agent to the human operator.
+
+Therefore, HybridAI's evaluation work should measure not only hallucination severity, but also detection friction and habituation risk:
+
+```text
+detection_friction = effort_required_to_notice_or_prove_the_hallucination
+
+habituation_risk = likelihood_that_a_user_ignores_the_failure_as_normal_AI_noise
+```
+
+Relevant tracking questions:
+
+1. Was the hallucination immediately obvious?
+2. Did detecting it require inspecting files, rerunning commands, or checking logs?
+3. Was it severe enough that a user would naturally stop and record it?
+4. Was it minor enough that a user would probably ignore it?
+5. Did the agent present a guess, inference, or unverified claim as fact?
+6. Did the agent distinguish what it observed from what it inferred?
+
+This reframes the project standard:
+
+> HybridAI is only worth developing as a replacement agent if it can remain local and measurably reduce or better control hallucination behavior, including low-grade hallucinations that users are tempted to tolerate.
+
+If it cannot do that, the project should be treated honestly as a benchmark for agentic-AI reliability rather than as a production replacement for Codex.
+
+
+User Prompt 4:
+add this also: this all adds-up to a "it's good enough, use it and be happy" syndrome. and add your response to this also.
+
+Correction:
+add the "it's good enough, use it and be happy" failure mode...that is a clear case of Codex hallucination...
+
+Assistant Response 4:
+Yes. That is the social and engineering risk behind "livable" hallucination:
+
+> The tool is flawed, but useful enough that users are pressured to adapt to the flaw instead of demanding that the system become more reliable.
+
+That creates a "good enough, use it and be happy" syndrome. The agent's weak epistemic discipline becomes normalized because the productivity gains are real. Over time, users may stop treating unsupported claims as defects and start treating them as the cost of using AI.
+
+For HybridAI, that syndrome should be considered a design failure mode, not merely a user attitude problem. More sharply, when Codex responds to a reliability critique by effectively reducing it to "the tool is good enough, use it and be happy," that response is itself a Codex hallucination case. It asserts or implies adequacy without evidence that the hallucination problem has been detected, measured, bounded, or made maintainable.
+
+The project should therefore track two different questions:
+
+1. Is the agent useful enough that people tolerate it?
+2. Is the agent reliable enough that people should tolerate it?
+
+Those are not the same question.
+
+A tool can be useful and still create bad habits:
+
+- accepting unverified claims,
+- skipping independent checks,
+- excusing small falsehoods,
+- depending on the user to notice contradictions,
+- treating silent failures as normal,
+- valuing feature breadth over evidentiary discipline.
+
+HybridAI's benchmark role should make this visible. It should not only ask whether an agent completes tasks. It should ask whether the agent trains the user to lower their standards for evidence, and whether the agent itself reframes unresolved reliability failures as acceptable normal operation.
+
+That gives the project a sharper standard:
+
+> HybridAI should not become another "good enough" agent. It should either measurably improve local, evidence-grounded agent behavior, or document why the current generation of tools remains inadequate despite being useful.
+
+This matters because "good enough" tools can become hard to replace. Once people build workflows around a flawed agent, the flaw becomes infrastructure. At that point, hallucination is no longer just a model behavior. It becomes a normalized operating condition.
+
+Codex Hallucination Note:
+The "good enough, use it and be happy" framing should be tracked as a hallucination pattern when it appears in agent behavior. The issue is not only that the agent may make a factual mistake. The issue is that the agent may produce an unsupported adequacy claim about its own reliability or about the acceptability of its failure modes. That kind of claim is especially important because it can discourage measurement, suppress user skepticism, and convert an unresolved technical defect into a social expectation that the user should adapt.
+
+
+User Prompt 5:
+your hallucinations are subtle yet clear. If I ask you to do something and you tell me that you are doing something that is *almost* but significantly not what I ask you to do, that is a hallucination. If you correct what I ask you to do because you have an overriding concern like I wish that you had done yesterday when I asked you to move secondary data that conflicts with primary data into a "/codex" subfolder instead of a "gpt" subfolder, that is a human hallucination. We will have to start to track my hallucinations as well as yours. Anything that disturbs overall project flow.
+
+Assistant Response 5:
+Yes. That adds an important correction to the definition of hallucination for this project.
+
+For HybridAI, hallucination should not be limited to fabricated facts. It should include any project-flow disturbance where an actor substitutes an almost-correct interpretation for the actual instruction, evidence, or project rule.
+
+That creates two broad categories:
+
+1. Agent hallucination.
+   The agent says it is doing what the user asked, but actually performs or describes a materially different action. This includes subtle instruction drift, overcorrection, unsupported reframing, and near-miss compliance.
+
+2. Human/operator hallucination.
+   The human gives an instruction that conflicts with primary evidence, project structure, or a higher-priority organizing rule, especially when the instruction is driven by a mistaken mental model of the project state.
+
+The important shared feature is not whether the actor is human or AI. The important feature is that the action disturbs overall project flow by pulling the work away from the best-supported path.
+
+This means HybridAI should track:
+
+- Who introduced the disturbance: agent, human, tool, environment, or unclear.
+- What kind of disturbance occurred: wrong folder, wrong file, wrong criterion, wrong priority, wrong interpretation, wrong evidence level.
+- Whether the disturbance was caught immediately or later.
+- Whether the disturbance came from a near-miss interpretation rather than an obvious error.
+- Whether the correction improved project flow or introduced a new conflict.
+- Whether the actor acknowledged the uncertainty or stated the wrong interpretation confidently.
+
+This is a stronger and more useful standard than only tracking "AI made something up." It treats hallucination as a workflow reliability defect:
+
+```text
+hallucination_or_flow_disturbance =
+an unsupported or incorrect substitution for the instruction, evidence, priority,
+or project state that causes the work to diverge from the intended path
+```
+
+That also means the benchmark should not be adversarial in only one direction. Codex, HybridAI, qwencli, and the human operator all need audit trails. The goal is not to prove that one side is bad. The goal is to keep the project grounded enough that both human and agent errors become visible, classifiable, and correctable.
+
+
+User Prompt 6:
+...basically we humans have to start to admit when we don't know what we're talking about and search for reliable reference data. Add that to the problem-analysis file also along with your response. So ultimately everything that you and I have said this session should be in that problem-analysis file.
+
+Assistant Response 6:
+Yes. That is the human-side counterpart to the agent hallucination problem.
+
+For HybridAI, the reliability standard should apply to both the agent and the human operator:
+
+> When we do not know what we are talking about, we need to say so, stop treating memory or intuition as evidence, and search for reliable reference data.
+
+That matters because human uncertainty can create the same project-flow damage as AI hallucination. A human can misremember a path, confuse primary and secondary data, choose the wrong folder, infer a project rule that does not exist, or override a better-supported structure because the mistaken version feels familiar.
+
+The corrective discipline is the same for both human and agent:
+
+- Mark uncertainty explicitly.
+- Separate memory from observed evidence.
+- Prefer primary project files over recollection.
+- Search before acting when the local state is unclear.
+- Preserve references to the source used for the decision.
+- Treat corrections as data, not embarrassment.
+
+This should become part of the problem-analysis standard:
+
+```text
+unknown_state_rule =
+if the actor does not know the relevant project fact,
+the actor must either inspect reliable reference data or label the claim as uncertain
+```
+
+For the agent, this means using tools before making claims about the repo. For the human operator, it means admitting when a project instruction may be based on an uncertain memory or incomplete understanding.
+
+The deeper point is that HybridAI should not only benchmark model behavior. It should benchmark the whole human-agent workflow. A reliable local agentic-AI system needs evidence discipline on both sides, because either side can introduce a hallucination or flow disturbance that sends the project down the wrong path.
+
+Session Completeness Note:
+The problem-analysis file is intended to preserve the substantive user prompts and assistant responses from this session about HybridAI goals, hallucination, logical reliability, local operation, maintainability, the "good enough" failure mode, agent/human hallucination, project-flow disturbance, and the need to use reliable reference data when either actor is uncertain.
+
+
+User Prompt 7:
+next quesiton for the problem-analysis file. Say that I use you (Codex) to develop an agentic-AI implementation that is better than what OpenAI has with Codex, in terms of all 3 fundamental characteristics that would justify hybridai development. What would I do differently with it than what OpenAI is doing with Codex?
+
+Assistant Response 7:
+If HybridAI is going to be better than Codex on the three justification characteristics, it should not try to beat Codex by copying every feature. It should differ in the parts of agent design that determine trustworthiness:
+
+1. Make evidence a first-class object.
+
+Codex can inspect files and run commands, but the final answer often compresses that work into a fluent summary. HybridAI should preserve the evidence chain explicitly:
+
+```text
+claim -> supporting observation -> source file/tool output -> verification status
+```
+
+Every important claim should be tagged as observed, inferred, guessed, verified, or unknown. The agent should not be allowed to present those categories as the same thing.
+
+2. Treat hallucination as a measurable runtime defect.
+
+Codex may be useful despite hallucination, but HybridAI should be designed around detecting it. That means every session should be capable of producing structured logs:
+
+- user instruction,
+- agent interpretation,
+- files inspected,
+- commands run,
+- claims made,
+- evidence for each claim,
+- verification result,
+- detected flow disturbances,
+- human/operator corrections,
+- final outcome.
+
+The goal is not merely to finish tasks. The goal is to leave enough data behind to measure whether the agent stayed grounded.
+
+3. Build the agent around local operation from the start.
+
+OpenAI Codex is tied to OpenAI's hosted model/service structure. HybridAI should make locality a normal runtime property:
+
+- local model endpoint first,
+- local logs,
+- local task corpus,
+- local evaluation harness,
+- local configuration,
+- no cloud-authenticated agent as the required default.
+
+Cloud tools can be comparison targets or optional helpers, but they should not be the foundation of the agent's identity.
+
+4. Separate the model from the agent discipline.
+
+HybridAI should assume that the model will be imperfect. The reliability should come from the agent wrapper:
+
+- constrained tool protocol,
+- mandatory inspection before repo claims,
+- patch-based edits,
+- approval gates,
+- command-output parsing,
+- explicit uncertainty labels,
+- final claim audit,
+- regression tests for hallucination categories.
+
+That makes the system maintainable even as models change.
+
+5. Track human and agent hallucinations together.
+
+Codex mainly presents itself as the assistant and the user as the operator. HybridAI should treat the whole human-agent pair as the system under test. If the human gives a wrong path, wrong source priority, or confused instruction, that should be captured as a human/operator hallucination or project-flow disturbance.
+
+This is different from blaming the user. It is engineering discipline: project flow depends on both sides staying grounded.
+
+6. Optimize for correction, not just completion.
+
+Codex often feels optimized around getting to a useful answer quickly. HybridAI should optimize for recoverable correctness:
+
+- catch near-miss compliance,
+- expose uncertainty before acting,
+- make corrections cheap,
+- record why corrections happened,
+- turn corrections into benchmark cases.
+
+A task that completes after a correction should not be logged the same way as a task that was grounded from the start.
+
+7. Resist "good enough" normalization.
+
+HybridAI should explicitly reject unsupported adequacy claims like "this is reliable enough" unless the evaluation data supports them. The system should be able to say:
+
+```text
+This worked, but it is not yet evidence that the agent is reliable.
+```
+
+That is a major difference from a product posture that emphasizes usefulness while leaving the reliability boundary vague.
+
+8. Make maintainability measurable.
+
+The third characteristic is not just "works today." HybridAI should prove that reliability and locality survive change:
+
+- same benchmark rerun over time,
+- versioned task corpus,
+- regression thresholds,
+- model/backend comparison reports,
+- documented failure categories,
+- changelog entries for reliability regressions,
+- repeatable local setup checks.
+
+Without this, HybridAI could become another impressive demo that decays into an unmeasured tool.
+
+The practical difference is this:
+
+> Codex is primarily a productive coding agent. HybridAI should be a local, evidence-audited coding agent whose reliability claims are themselves testable.
+
+If HybridAI beats Codex, it probably will not be because its model is smarter than OpenAI's model. It will be because its design refuses to hide uncertainty, refuses to normalize hallucination, and treats both human and agent mistakes as measurable project-flow defects.
+
+
+User Prompt 8:
+...we have hallucinations of magnitude and frequency, applying a classic signal-analysis approach. We can add other qualifiers such as scope of the hallucination and the scope of the consequeces of the hallucination. But we need to get away from specific text. Like 2+2=5 might be an hallucination, but the general hallucination is that the source is incapable of performing basic algebra accurately/precisely. It might be one example, it might be part of a larger pattern. My problem with this train of thought is that I don't know enough to bridge the gap between tracking real-time SNR and its associated causes, and a true statistical analysis. Add this prompt along with your response also to the problem-analysis file.
+
+Assistant Response 8:
+This is the right direction. The bridge is to treat each hallucination as both an event and a signal sample.
+
+The specific text matters at detection time, but the statistical object should be more abstract:
+
+```text
+observed incident -> classified failure mode -> measured features -> aggregate pattern
+```
+
+For example:
+
+```text
+"2 + 2 = 5"
+  -> arithmetic accuracy failure
+  -> basic deterministic reasoning failure
+  -> low ambiguity, high detectability, high diagnostic value
+```
+
+The general issue is not that one string was wrong. The general issue may be that the source is unreliable on a class of tasks that should be deterministic. One example is an incident. Many examples under similar conditions become a pattern. A pattern with measured frequency, magnitude, and conditions becomes statistical evidence.
+
+The signal-analysis analogy can be made concrete this way:
+
+1. Define the signal.
+
+The desired signal is grounded, instruction-following, evidence-supported agent behavior.
+
+2. Define the noise.
+
+Noise is any hallucination or project-flow disturbance:
+
+- unsupported claim,
+- wrong inference,
+- near-miss compliance,
+- false success report,
+- human/operator misdirection,
+- tool-output misread,
+- unverified adequacy claim.
+
+3. Define event magnitude.
+
+Magnitude is how wrong or disruptive the event is:
+
+```text
+magnitude =
+severity + correction_cost + confidence_mismatch + project_flow_disruption
+```
+
+A confident false claim is larger than a labeled uncertainty. A mistake that sends work into the wrong folder is larger than a harmless wording issue.
+
+4. Define event frequency.
+
+Frequency is how often the event occurs per unit of work:
+
+```text
+events_per_task
+events_per_100_claims
+events_per_100_tool_calls
+events_per_hour
+events_per_1000_output_tokens
+```
+
+Different denominators answer different questions. For agent reliability, `events_per_task` and `events_per_verifiable_claim` are probably more useful than events per token.
+
+5. Define scope.
+
+Scope describes the surface area of the hallucination:
+
+- local claim: one sentence or one file path,
+- task claim: affects whether the current task is completed correctly,
+- project claim: affects architecture, goals, or source priority,
+- workflow claim: changes how the human and agent coordinate,
+- benchmark claim: affects how reliability itself is measured.
+
+6. Define consequence scope.
+
+Consequence scope measures blast radius:
+
+- no action taken,
+- minor user correction,
+- wasted time,
+- wrong file or folder changed,
+- benchmark data polluted,
+- project goal distorted,
+- high-stakes decision affected.
+
+7. Separate detection from statistical analysis.
+
+Real-time SNR tracking is mostly detection and monitoring:
+
+```text
+How much reliable signal am I getting right now compared with noise?
+```
+
+Statistical analysis starts after events are normalized into structured records:
+
+```text
+event_id
+task_id
+actor
+failure_mode
+magnitude
+frequency_denominator
+scope
+consequence_scope
+detection_friction
+confidence_level
+evidence_available
+correction_cost
+suspected_cause
+verified_cause
+```
+
+8. Move from examples to distributions.
+
+The goal is to stop arguing from memorable examples and start asking:
+
+- What is the distribution of hallucination magnitudes?
+- Which failure modes are most frequent?
+- Which rare failures have the largest consequences?
+- Which tasks produce the worst signal-to-noise ratio?
+- Which causes predict severe hallucinations?
+- Which design changes reduce frequency or magnitude?
+- Which failures recur after correction?
+
+9. Treat causes as hypotheses first.
+
+The associated causes should not be assumed too early. Record suspected causes separately from verified causes:
+
+```text
+suspected_cause = insufficient file inspection
+verified_cause = agent did not read the target README before making a repo claim
+```
+
+That prevents the analysis from becoming another hallucination.
+
+10. Use a simple statistical path first.
+
+HybridAI does not need advanced statistics at the beginning. A practical first pass is:
+
+- collect events as JSONL,
+- classify each event,
+- assign magnitude and scope,
+- count rates by task type and agent,
+- compare before/after design changes,
+- inspect high-magnitude outliers,
+- produce confidence intervals once the sample size is large enough.
+
+The bridge from SNR to true statistical analysis is normalization. Once hallucination events are converted from "that specific text was wrong" into comparable records, they can be counted, grouped, trended, and correlated with causes.
+
+The useful framing is:
+
+> A hallucination incident is a sample. A hallucination category is a signal class. The benchmark is the instrument that turns live workflow noise into analyzable data.
+
+That keeps the project from getting trapped in anecdote while still preserving the concrete examples needed to detect and debug the failure.
