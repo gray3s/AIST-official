@@ -1847,3 +1847,8 @@ The next useful outputs are:
 The key question going forward is not only "what did we produce?" It is:
 
 > Can this analysis be converted into a disciplined measurement and design system without creating a new layer of false confidence?
+
+Related Project-Goals Document:
+The developing HybridAI project goals are tracked separately. A timestamped public copy is available here:
+
+https://github.com/gray3s/AIST-official/blob/main/hybridAI_PROJECT_GOALS_20260712.md
