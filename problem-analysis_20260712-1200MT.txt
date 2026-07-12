@@ -701,3 +701,173 @@ The useful framing is:
 > A hallucination incident is a sample. A hallucination category is a signal class. The benchmark is the instrument that turns live workflow noise into analyzable data.
 
 That keeps the project from getting trapped in anecdote while still preserving the concrete examples needed to detect and debug the failure.
+
+
+User Prompt 9:
+ok let's brainstorm a little-bit here. What impedes program-flow? I generally would consider impediments to program-flow in two categories: logic/logical errors and factual errors. Logical errors lead to faulty observations and  analysis which are often manifested in factual errors. Factual errors can be listed in a simple way, such as faulty data, faulty data-sources, errors in transmission between requests and replies, "man in the middle" attacks. Phishing attacks, hostile-intruder attacks. These are beginning to sound a lot more like security issues then simple "factual errors". What stands out to me are logical errors based on omissions, assumptions and "insufficient/excessive scope" errors. Generally erroneous scope, not just simple faulty Boolean (or even "fuzzy") logic. Errors in statistical analysis are another class of logic errors, but that often results in inadequate mastery of the topic or applicaiton of statistics. The classic "Monty Hall" question (the one about picking 1 door of 3 to find a prize, and re-evaluating your choice given the answer hidden behind one of the 3 doors) exposed a deep rift between irrational and rational thought. We could go back in time to include every mainstream delusion that was resolved by a truly scientific application of scientific thought. What do you think, am I missing anything here? Add your response to the "problem-analysis document" that we have been working on throughout this session and update the associated link so that I don't have to update my LinkedIn post that makes use of it. I expect that at least some people will use that link as a seed for further discussion of this topic and it will be interesting to see where that seed takes root and how it develops from here.
+
+Assistant Response 9:
+Your two-category frame is useful, but I would expand it slightly. Program-flow is impeded by more than factual and logical errors. Those are central, but several other classes explain why otherwise intelligent systems, human or AI, drift away from reliable work.
+
+A better working taxonomy might be:
+
+1. Factual errors.
+
+These are errors in the data layer:
+
+- false data,
+- stale data,
+- missing data,
+- corrupted data,
+- misquoted data,
+- wrong source priority,
+- bad transmission between request and reply,
+- source substitution,
+- malicious source manipulation.
+
+This category quickly overlaps with security because factual integrity depends on source integrity. A man-in-the-middle attack, phishing attack, poisoned dataset, hostile-intruder edit, or forged reference is not merely a "wrong fact." It is an attack on the evidence channel.
+
+For HybridAI, this means factual reliability cannot be separated from provenance:
+
+```text
+fact_quality = content_accuracy + source_integrity + transmission_integrity + freshness + relevance
+```
+
+2. Logical errors.
+
+These are errors in the reasoning layer:
+
+- invalid inference,
+- contradiction,
+- circular reasoning,
+- false equivalence,
+- wrong causal model,
+- wrong abstraction level,
+- failure to update after new evidence,
+- treating correlation as causation,
+- treating plausibility as proof.
+
+But you are right that simple Boolean logic is not the main issue. Many serious errors are scope errors.
+
+3. Scope errors.
+
+Scope errors deserve their own category because they are common in agentic work:
+
+- insufficient scope: the actor ignores relevant files, facts, risks, or constraints;
+- excessive scope: the actor broadens the task beyond the user's intent;
+- wrong scope: the actor works at the wrong level of abstraction;
+- scope substitution: the actor solves a related problem instead of the requested problem;
+- scope drift: the actor begins correctly but gradually moves off target.
+
+This is where many subtle Codex hallucinations live. The agent does something almost right, but the actual boundary of the task has shifted.
+
+4. Omission errors.
+
+Omissions are not just missing facts. They can be missing checks, missing alternatives, missing constraints, missing context, or missing uncertainty labels.
+
+An omission can look harmless because nothing visibly false was said. But the project-flow effect can be severe:
+
+```text
+omitted constraint -> wrong scope -> wrong action -> factual inconsistency
+```
+
+For agentic AI, omission errors are often more dangerous than explicit falsehoods because they are harder to detect in real time.
+
+5. Assumption errors.
+
+Assumptions are necessary, but unmarked assumptions are dangerous. The key distinction is:
+
+```text
+declared assumption = manageable uncertainty
+hidden assumption = hallucination risk
+```
+
+Many human and AI flow disturbances come from acting on hidden assumptions about project state, user intent, file location, source priority, or acceptable risk.
+
+6. Statistical and probabilistic reasoning errors.
+
+The Monty Hall example is a good marker because it shows that even competent people can strongly prefer an intuitive answer that is mathematically wrong. This class includes:
+
+- base-rate neglect,
+- sampling bias,
+- survivorship bias,
+- regression-to-the-mean errors,
+- small-sample overconfidence,
+- p-hacking,
+- mistaking anecdote for distribution,
+- confusing frequency, probability, confidence, and causation.
+
+For HybridAI, this matters because hallucination analysis itself can hallucinate if the statistics are weak. A few vivid examples do not establish a rate. A rate without denominator discipline does not establish reliability. A correlation without causal care does not identify a design defect.
+
+7. Epistemic errors.
+
+These are errors about knowing:
+
+- not knowing what is known,
+- not knowing what is unknown,
+- confusing memory with evidence,
+- confusing authority with correctness,
+- failing to distinguish observation, inference, guess, and verification,
+- refusing to search reliable reference data when uncertain.
+
+This class ties directly to the earlier human/operator hallucination point. The problem is not only whether a claim is true. The problem is whether the actor has a justified basis for making the claim.
+
+8. Communication and translation errors.
+
+Program-flow can also be disturbed when the request and reply are not aligned:
+
+- ambiguous instruction,
+- misunderstood intent,
+- compressed context,
+- lossy summary,
+- terminology mismatch,
+- answer shaped to sound helpful rather than to preserve the exact request.
+
+In agentic systems, communication errors become action errors because the system can edit files, run commands, move data, or publish results.
+
+9. Authority and priority errors.
+
+Projects need rules for source priority. Without them, the actor may follow the wrong authority:
+
+- secondary data over primary data,
+- memory over current files,
+- convenience over project rule,
+- tool output over verified source,
+- user instruction over safety constraint,
+- safety concern over task instruction without explicitly naming the conflict.
+
+The last item matters because sometimes overriding the user's instruction is correct, but doing it silently is not. The agent should state the conflict and preserve the reason.
+
+10. Security and adversarial errors.
+
+Security is not separate from program-flow. It is the hostile version of factual, communication, and authority failure:
+
+- forged evidence,
+- prompt injection,
+- malicious instructions hidden in files,
+- compromised dependency,
+- poisoned benchmark,
+- spoofed command output,
+- unauthorized actor changing project state.
+
+For an agentic-AI project, security belongs in the hallucination discussion because hostile input can induce false beliefs and wrong actions.
+
+So the missing piece is probably this:
+
+> Program-flow is disturbed whenever evidence, reasoning, scope, communication, authority, or security causes the actor to diverge from the best-supported path.
+
+That gives HybridAI a broader model than "logic error versus factual error":
+
+```text
+program_flow_impediment =
+any defect in evidence, reasoning, scope, assumption, statistics, communication,
+authority, or security that causes human or agent action to diverge from the
+best-supported project path
+```
+
+The important move is to classify the disturbance at the right abstraction level. "2 + 2 = 5" is one incident. The broader failure mode may be arithmetic unreliability, deterministic reasoning failure, failure to use a calculator/tool, or overconfident answer generation without verification. The classification should preserve both:
+
+- the concrete incident, so it can be audited;
+- the generalized failure mode, so it can be counted statistically.
+
+That is how the problem-analysis file can become more than a transcript. It can become the seed of a taxonomy for human-agent program-flow reliability.
