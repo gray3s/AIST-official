@@ -1072,3 +1072,54 @@ Useful audit questions:
 7. What was assumed rather than confirmed?
 
 This is one of the most common ways projects become irrational: they preserve the appearance of development while losing contact with the originating need.
+
+
+User Prompt 13:
+so one of the clear problems with agentic-AI is thaat the client may appear to solve user needs but fundamentally fail to do so in a rational manner.
+
+Assistant Response 13:
+Yes. That is a core agentic-AI failure mode:
+
+> The agent appears to satisfy the user because it produces a plausible artifact, but the path from user need to solution is not rationally grounded.
+
+This is different from a simple wrong answer. The output may look useful. It may even partially work. But the agent may still have failed at the deeper task because it did not preserve a justified chain from:
+
+```text
+user need
+  -> interpreted requirement
+  -> checked assumptions
+  -> scoped task
+  -> evidence-gathering
+  -> design choice
+  -> implementation
+  -> verification
+  -> success claim
+```
+
+When that chain is broken, the agent can create the appearance of progress while quietly substituting its own interpretation, assumptions, or preferred solution. That is a rationality failure even if the final output is polished.
+
+This should be tracked as an apparent-solution failure:
+
+```text
+apparent_solution_failure =
+the agent produces an output that appears to address the user need,
+but lacks a traceable, evidence-supported mapping from the actual need
+to the chosen solution and verification claim
+```
+
+Common forms include:
+
+- solving a nearby problem instead of the actual problem,
+- satisfying the wording of a request while missing the intent,
+- producing an impressive artifact that lacks requirement traceability,
+- using tests that do not verify the user's real need,
+- overfitting the solution to what the agent can easily do,
+- reporting success without proving that the client-meaningful outcome was met.
+
+This matters because agentic-AI can be persuasive at the presentation layer. It can make irrational development look rational by producing organized plans, clean prose, plausible code, and confident summaries. The danger is not only that the agent may fail. The danger is that the agent may make failure look like successful project flow.
+
+For HybridAI, the corrective standard should be:
+
+> A solution is not rationally successful unless the agent can show how the user's actual need was interpreted, scoped, implemented, verified, and tied back to a client-meaningful success criterion.
+
+That makes user-need traceability part of hallucination control. Without it, the agent can "solve" the task in appearance while failing the project in substance.
