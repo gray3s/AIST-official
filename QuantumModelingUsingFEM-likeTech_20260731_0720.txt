@@ -1,0 +1,53 @@
+Background chat:
+
+OP (Original Posters' post):
+I ran a 32-qubit quantum computer on my laptop this weekend.
+
+Not a metaphor. A full quantum state simulation — every amplitude, exact math — on a MacBook. 
+The screenshot below is the actual experiment. Short version:
+I created 32 "quantum coins." Each one genuinely undecided — neither heads nor tails until observed. 
+Linked all 32 into one shared quantum state. Measured them 1,000 times.
+
+32 independent coins would all agree once in about 2.1 billion flips.
+
+Mine agreed 1,000 times out of 1,000. → 488 runs: all 32 landed zeros → 512 runs: all 32 landed ones → mixed outcomes: zero
+
+No qubit had a value until the moment of measurement — yet they never once disagreed. 
+That's entanglement. Einstein called it "spooky action at a distance." It ran on my laptop in 71 seconds.
+
+The catch — and the entire story of quantum computing in one line: 
+faking this with classical hardware took 69 GB of RAM, and every added qubit doubles it. 
+33 qubits wouldn't fit in my 128 GB machine. 40 would need 18 terabytes. 
+50 would need more RAM than most data centers hold. That wall isn't an engineering gap — 
+it's the mathematical reason quantum hardware is worth billions.
+
+While the lab was open, I ran the classics too: → 
+Grover's search: found 1 marked item out of 32 in 4 queries. 
+Classical average: 16. → Shor's algorithm: factored 15 into 3 × 5 by quantum period-finding — 
+the method that will eventually retire RSA. Breaking your 2048-bit key needs thousands of error-corrected qubits that don't exist yet.
+
+The nuclear Navy taught me you don't trust a system you haven't taken apart. 
+This weekend I took apart quantum computing.
+
+Verdict: the hype has a real core, the timeline is where honest people disagree — 
+and if your security team hasn't started post-quantum crypto planning, that part isn't hype at all. 
+NIST already standardized the replacements.
+
+Total cost: $0 in software. One laptop. One weekend.
+
+My Response:
+Hm, then I guess that we don't need to actually *build* real quantum-computers. 
+We can just access them online using software front-ends like this one.
+
+OP response:
+...tempting, but the wall says otherwise. The simulation uses exact physics, 
+yet each added qubit doubles the memory: my Mac tops out at 32 qubits, while the biggest supercomputers on Earth are at ~45. 
+Beyond that, no amount of classical hardware can fake it — that's precisely why the real machines matter. 
+The part you can do online though: IBM gives free cloud access to actual 100+ qubit quantum processors. 
+The front-end is the same 20 lines of Python; the back-end is a dilution refrigerator in Yorktown Heights.
+
+
+My followup questions:
+Question1: Is the OP response true? 
+Question2: can a 32-qubit online simulator effectively mimic a real 2048-qbit system 
+through the use of a FEM-like algorithm or any other algorithm?

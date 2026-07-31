@@ -1,0 +1,454 @@
+================================================================================
+ANALYSIS: "Quantum Modeling Using FEM-like Tech"
+Source file: QuantumModelingUsingFEM-likeTech_20260731_0720.txt
+Date of analysis: 2026-07-31
+================================================================================
+
+SHORT ANSWERS
+-------------
+Question 1 -- Is the OP's response true?
+   Mostly, but with one materially wrong sentence and one important omission.
+   The memory arithmetic is exactly right. The claim that "beyond ~45 qubits no
+   amount of classical hardware can fake it" is FALSE as stated -- classical
+   simulability depends on the *circuit*, not the qubit count, and every single
+   circuit the OP actually ran is classically easy at thousands of qubits. The
+   IBM cloud-access claim is true with caveats.
+
+Question 2 -- Can a 32-qubit online simulator mimic a real 2048-qubit system via
+a FEM-like algorithm or any other algorithm?
+   In general, no -- and the reason is not memory layout, it is entanglement
+   entropy plus complexity theory. But the FEM instinct is a *good* one: the
+   quantum analogue of FEM already exists (tensor networks / MPS-DMRG), it is
+   the state of the art, and it does push far past 32 qubits -- for circuits
+   whose "solution is smooth." For a 2048-qubit circuit doing something worth
+   doing, no such method can work, and the proof is almost tautological: if it
+   could, nobody would be spending billions on the hardware.
+
+================================================================================
+PART 1 -- FACT-CHECKING THE ORIGINAL POST
+================================================================================
+
+VERIFIED CORRECT
+----------------
+1. 69 GB for 32 qubits. 2^32 = 4,294,967,296 amplitudes. At complex128
+   (16 bytes: two float64s) that is 68,719,476,736 bytes = 68.72 GB decimal,
+   which is *exactly* 64 GiB. "69 GB" is right.
+
+2. Doubling per qubit, and the specific ceilings:
+      33 qubits -> 137.4 GB = exactly 128 GiB (i.e. the entire nominal RAM of a
+                   "128 GB" MacBook, so it genuinely will not fit)
+      40 qubits -> 17.59 TB   ("18 terabytes" -- correct)
+      50 qubits -> 18.01 PB   ("more than most data centers" -- correct)
+   The exponential-wall framing is legitimate and well stated.
+
+3. "32 independent coins would agree once in about 2.1 billion flips."
+   P(all same) = 2 x (1/2)^32 = 2^-31 = 1 in 2,147,483,648. Correct.
+
+4. The 488 / 512 split. For a GHZ state, n=1000, p=0.5, the standard deviation
+   is sqrt(250) = 15.8. A 488/512 split is 0.76 sigma from center -- exactly
+   what an honest run looks like. (A suspiciously clean 500/500 would have been
+   more of a red flag.)
+
+5. Grover: 4 queries for N=32. floor((pi/4) x sqrt(32)) = floor(4.44) = 4.
+   Correct. Classical expected queries = (32+1)/2 = 16.5, so "16" is fair.
+
+6. 71 seconds is plausible, which is a point in the OP's favor for authenticity.
+   A 32-qubit GHZ needs 1 Hadamard + 31 CNOTs; each two-qubit gate is a full
+   streaming pass over the state (read + write ~137 GB). 32 gates x 137 GB
+   = ~4.4 TB of memory traffic. An M3/M4 Max sustains roughly 400 GB/s, giving
+   ~11 s of pure bandwidth, plus allocation, zeroing, and 1000 samplings. 71 s
+   is the right order of magnitude. The numbers hang together.
+
+7. NIST has standardized post-quantum replacements. True: FIPS 203 (ML-KEM,
+   from CRYSTALS-Kyber), FIPS 204 (ML-DSA, from CRYSTALS-Dilithium), FIPS 205
+   (SLH-DSA, from SPHINCS+), finalized August 2024, with HQC later selected as
+   a backup KEM. The OP's practical advice -- start PQC migration planning now,
+   independent of the hardware timeline -- is the soundest claim in the post.
+
+8. Shor factoring 15 into 3 x 5. Genuinely doable in a full simulator.
+
+THE CENTRAL PROBLEM WITH THE DEMONSTRATION
+------------------------------------------
+The 32-coin experiment, exactly as described, demonstrates nothing quantum.
+
+The reported data is: 1000 measurements, all 32 bits agreeing every time,
+~50/50 between all-zeros and all-ones. That distribution is reproduced perfectly
+by the most boring classical program imaginable:
+
+      flip one fair coin, then copy the result into 32 registers.
+
+That is a local hidden-variable model. It has no entanglement, needs no
+superposition, and fits in 32 bits of RAM instead of 69 GB. The "1 in 2.1
+billion" astonishment is doing rhetorical work it hasn't earned -- the coins are
+not independent in the classical model either, because they were copied from one
+source.
+
+What separates a GHZ state from a broadcast classical bit is *measuring in more
+than one basis*. Correlations in Z alone are classically trivial. The quantum
+signature only appears when you measure in X/Y bases as well and find
+correlations that no shared-randomness model can reproduce -- the Mermin/GHZ
+paradox (a deterministic, all-or-nothing contradiction with local realism) or a
+CHSH/Bell inequality violation. The OP measured one basis, 1000 times.
+
+This also means the appeal to Einstein and "spooky action at a distance" is
+misplaced twice over:
+   (a) The data shown is exactly what a *non-spooky* local model predicts.
+   (b) A simulation cannot test nonlocality at all. Nonlocality is a statement
+       about spacelike-separated measurements on physical systems. A single
+       laptop computing a state vector has no separation to violate. You can
+       simulate the *formalism* of entanglement; you cannot demonstrate the
+       *phenomenon*. That takes photons and distance.
+
+Similarly, "no qubit had a value until the moment of measurement" is an
+interpretive gloss, not an experimental finding. Inside the program, every
+amplitude had a fully determined value at every instant, and the measurement
+outcome came from a classical pseudorandom number generator with a seed. What
+was demonstrated is that the Born rule was implemented correctly.
+
+None of this makes the exercise worthless -- taking the linear algebra apart by
+hand is a genuinely good way to learn the subject, and the OP's cost/effort
+claims are honest. But the framing oversells what the run establishes.
+
+TWO SMALLER OVERSTATEMENTS
+--------------------------
+* Grover "found 1 marked item out of 32." You had to write the oracle, which
+  means you encoded the answer before searching for it. This is the standard
+  caveat on every Grover demo; the speedup is real in the query model but no
+  information was actually discovered. (Also worth noting: 32 items = 5 qubits,
+  not 32 -- easy to conflate with the other experiment.)
+
+* Shor on 15. In simulation this can be done properly. On real hardware, nearly
+  every historical "we factored N" result used a circuit compiled with knowledge
+  of the answer, a critique made forcefully by Smolin, Smith and Vargo
+  ("Oversimplifying quantum factoring"). Worth keeping straight when comparing
+  simulator results to hardware press releases.
+
+================================================================================
+PART 2 -- QUESTION 1: IS THE OP'S REPLY TRUE?
+================================================================================
+
+The OP made four claims. Scored individually:
+
+CLAIM A: "The simulation uses exact physics."
+   MISLEADING. It uses exact *linear algebra* on an idealized noiseless model.
+   The simulation is cleaner than any real device -- no decoherence, no gate
+   infidelity, no crosstalk, no leakage, no readout error. It is exact with
+   respect to the textbook, not with respect to nature. A real 32-qubit machine
+   would produce visibly worse GHZ data than the laptop did.
+
+CLAIM B: "My Mac tops out at 32 qubits."
+   TRUE ONLY FOR DENSE STATE-VECTOR SIMULATION. This is the crux, and it is
+   where the OP's argument quietly assumes its conclusion. The 69 GB is an
+   artifact of one method -- storing all 2^n amplitudes explicitly.
+
+   The GHZ circuit the OP ran is a *Clifford* circuit (Hadamard + CNOTs). By the
+   Gottesman-Knill theorem, Clifford circuits are simulable exactly in O(n^2)
+   time and space using a stabilizer tableau. Aaronson and Gottesman's CHP, or
+   Stim today, will produce that identical 488/512 result for 32 qubits in
+   microseconds and in a few kilobytes -- and will do 100,000 qubits on the same
+   laptop before lunch.
+
+   As a tensor network, a GHZ state has bond dimension 2. A 32-qubit GHZ as an
+   MPS is a few hundred bytes.
+
+   Grover with a single marked item is also cheap: every intermediate state is a
+   rank-2 combination of the marked basis state and the uniform superposition,
+   so the bond dimension stays tiny. MPS handles it at hundreds of qubits.
+
+   So the 69 GB was not a law of nature -- it was a tool choice. The one circuit
+   in the set that genuinely resists compression is Shor's (the modular
+   exponentiation and QFT generate real entanglement and a large non-Clifford
+   gate count), and even there MPS methods have been pushed well past
+   state-vector limits.
+
+CLAIM C: "Beyond ~45 qubits, no amount of classical hardware can fake it."
+   FALSE AS STATED. This is the one sentence that should be retracted.
+
+   The ~45-qubit figure is right for exact dense state-vector simulation
+   (Haener & Steiger reached 45 qubits in 2017 on Cori II using roughly half a
+   petabyte across 8192 nodes; compression tricks have nudged this to the high
+   40s / low 60s at reduced fidelity). But classical simulability is not a
+   function of qubit count. It is a function of the circuit's entanglement
+   structure, its non-Clifford ("magic") content, its depth, and its noise
+   level. Counterexamples, all real:
+
+     - Clifford circuits: thousands of qubits, exact, poly cost.
+     - Clifford + few T gates: cost scales with T-count, not qubit count.
+     - Low-entanglement (area-law) circuits: MPS/PEPS handle hundreds to
+       thousands of qubits.
+     - Shallow / structured circuits: tensor-network contraction has been used
+       at 60-120+ qubits.
+     - Noisy circuits: this is the most damaging counterexample to the OP's
+       framing. IBM's much-publicized 127-qubit "quantum utility" experiment
+       (Kim et al., Nature 2023) was matched or beaten within months by purely
+       classical methods -- tensor networks (Tindall et al.) and sparse Pauli
+       dynamics / Pauli-path propagation (Begusic & Chan). Subsequent work has
+       shown that noise itself makes broad classes of circuits classically
+       simulable, because noise damps the long Pauli paths that carry the hard
+       part of the computation.
+
+   The defensible version of Claim C is: "There *exist* circuits on 50-100
+   qubits that no classical hardware can simulate, and we do not know how to
+   tell in advance which ones." That is still a strong claim and still justifies
+   building the hardware. But "beyond 45, classical is dead" is not right, and
+   the noisy-circuit results cut against hardware-advantage claims specifically.
+
+CLAIM D: "IBM gives free cloud access to actual 100+ qubit processors; the
+front-end is the same 20 lines of Python."
+   TRUE, WITH CAVEATS. IBM's open plan does provide free access to 100+ qubit
+   devices (127-qubit Eagle, and the 133/156-qubit Heron generation). The Qiskit
+   front-end really is nearly identical -- swap the Aer simulator backend for a
+   hardware backend. Caveats worth stating:
+     - Free-tier time is capped (on the order of ~10 minutes of QPU time per
+       month) and queues can be long.
+     - Results are *noisy*. On a real 127-qubit device, a naive 32-qubit GHZ will
+       not give 1000/1000 agreement; expect meaningful mixed-outcome counts from
+       decoherence and readout error. Getting clean results requires error
+       mitigation, transpilation tuning, and connectivity-aware layout.
+     - The OP's own rhetorical setup gets inverted here: the simulator is the
+       thing that produced the perfect textbook data. The real machine is the
+       messy one.
+
+NET VERDICT ON THE OP'S REPLY
+   The conclusion -- "you still need to build real quantum computers" -- is
+   correct. The argument offered for it is the weakest available one, because it
+   rests on a memory-footprint accident of a single simulation technique rather
+   than on the actual barrier, which is computational complexity. And it is
+   stated with a false universal ("no amount of classical hardware").
+
+================================================================================
+PART 3 -- QUESTION 2: CAN A FEM-LIKE ALGORITHM LET 32 QUBITS MIMIC 2048?
+================================================================================
+
+3.1 FIRST, A TERMINOLOGY DISAMBIGUATION
+---------------------------------------
+"2048 qubits" and "RSA-2048" are different things and it is worth separating
+them, since the OP's post invoked RSA:
+
+  * 2048 *physical* qubits already exist and are not the frontier. D-Wave's
+    annealers passed 2000 qubits in 2017 and are now in the 5000+ range (though
+    annealers are not universal gate-model machines and are far more
+    classically tractable). Neutral-atom platforms have gone from ~1180 atoms
+    (Atom Computing, 2023) to multi-thousand-atom arrays. Raw qubit count is
+    the easy axis.
+
+  * 2048 *logical*, error-corrected qubits do not exist. Current state of the
+    art is single-digit to low-double-digit logical qubits (Google's Willow
+    below-threshold surface-code result in 2024; Quantinuum/Microsoft's ~12
+    logical qubits; QuEra's 48 logical qubits on neutral atoms). Each logical
+    qubit costs roughly 10^2-10^3 physical qubits.
+
+  * Breaking RSA-2048 is a *different* number again. Gidney & Ekera's 2021
+    estimate was ~20 million noisy physical qubits for 8 hours; Gidney's 2025
+    revision brought that under 1 million physical qubits for under a week.
+    Enormous progress on the estimate -- and still two to three orders of
+    magnitude beyond any existing device.
+
+So "mimic a real 2048-qubit system" is asking about a machine that has not been
+built. The interesting version of the question is the one asked: is the
+exponential wall a *representation* problem that a smarter discretization could
+dissolve?
+
+3.2 WHY THE FEM ANALOGY IS THE RIGHT INSTINCT -- AND EXACTLY WHERE IT BREAKS
+----------------------------------------------------------------------------
+FEM is spectacularly effective because of a specific structural gift:
+
+  The domain has FIXED, LOW dimension (d = 1, 2, or 3), and the solution is
+  SMOOTH (elliptic regularity), so a small number of local basis functions
+  captures it. Degrees of freedom scale as O(h^-d) -- polynomial in refinement,
+  with d held constant.
+
+Quantum state space does not have that gift:
+
+  The Hilbert space dimension is 2^n. There is no fixed low-dimensional domain
+  to mesh. The effective dimensionality *grows with the number of qubits*.
+
+This is the classic curse of dimensionality, and it is worth being blunt about
+the scale: FEM and its relatives already become impractical for PDEs at d = 10,
+which is why high-dimensional problems are handed to Monte Carlo instead. The
+question is asking about d = 2048. The state vector alone would require ~10^618
+bytes. There are roughly 10^80 atoms in the observable universe. This is not a
+hardware gap, an engineering gap, or a Moore's-law gap. It is a different
+category of impossibility.
+
+Mapping the analogy term by term:
+
+    FINITE ELEMENT METHOD              QUANTUM CIRCUIT SIMULATION
+    ---------------------------------  ------------------------------------
+    Mesh elements / basis functions    Tensor-network bond dimension chi
+    Mesh refinement h -> 0             chi -> 2^(n/2)  (exact limit)
+    Elliptic regularity / smoothness   Area-law entanglement
+    Galerkin projection error          Truncation of Schmidt coefficients
+    Adaptive refinement at a shock     chi blowup as entanglement grows
+    Turbulence: DNS infeasible         Volume-law entanglement: exact
+                                       simulation infeasible
+    Fixed domain dimension d = 3       Effective dimension = n (grows!)
+
+The last row is the whole answer. Every other row shows the analogy working.
+That one row shows why it cannot be pushed to 2048.
+
+3.3 THE QUANTUM FEM ALREADY EXISTS: TENSOR NETWORKS
+---------------------------------------------------
+The single most useful thing to know here is that the FEM-like approach is not
+hypothetical -- it is the dominant tool in the field, and it is structurally the
+same idea: replace the full space with a variational manifold parameterized by a
+refinement knob.
+
+  * Matrix Product States (MPS) / DMRG -- the 1D workhorse. Bond dimension chi
+    is the refinement parameter. Cost is O(n x chi^3) instead of O(2^n). For
+    area-law states, chi stays bounded and you simulate *thousands* of qubits
+    on a laptop. This is precisely "FEM for quantum."
+  * PEPS / 2D tensor networks -- for 2D lattices; contraction is harder
+    (formally #P-hard in general) but approximable.
+  * Tree tensor networks, MERA -- other topologies for other entanglement
+    structures.
+  * Contraction-order optimization (e.g. cotengra) -- for shallow circuits,
+    treat the circuit as a tensor network and find a good contraction path.
+    This is what let classical machines catch up to Google's 53-qubit Sycamore
+    supremacy claim.
+
+And the complementary family, which trades a different resource:
+
+  * Stabilizer / Clifford tableau (Gottesman-Knill) -- exact, poly, thousands
+    of qubits. Not universal.
+  * Stabilizer rank / Clifford+T decomposition -- cost roughly 2^(0.5 t) in the
+    T-gate count t. Universal, and the exponential moves from n to t.
+  * Schrodinger-Feynman hybrid / circuit cutting -- slice the circuit, trade
+    memory for time exponential in the number of cuts.
+  * Feynman path summation -- O(1) memory, exponential time in gate count.
+  * Sparse Pauli dynamics / Pauli-path propagation (Heisenberg picture) --
+    propagate observables instead of states, truncate small Pauli terms. This is
+    the method that matched IBM's 127-qubit experiment.
+  * Neural-network quantum states -- RBM / transformer ansatze as a learned
+    compression of the wavefunction. Directly analogous to a data-driven
+    reduced-order model.
+  * "Dequantization" (Ewin Tang and successors) -- for quantum machine-learning
+    claims resting on low-rank linear algebra, classical sampling-based
+    algorithms achieve comparable scaling, removing the claimed speedup
+    entirely.
+
+Every one of these can, on the right problem, blow past 32 qubits by orders of
+magnitude. So the answer to "is there any algorithm that does better than dense
+state vector?" is emphatically yes, and the OP should know about them.
+
+3.4 WHY NONE OF THEM SOLVES THE STATED PROBLEM
+----------------------------------------------
+Each method above buys its efficiency by assuming structure. State the
+assumption and the failure mode becomes obvious:
+
+    METHOD                  ASSUMES                  FAILS WHEN
+    ----------------------  -----------------------  -------------------------
+    Stabilizer tableau      Clifford-only gates      Any T / Toffoli / QFT
+    Stabilizer rank         Few non-Clifford gates   Shor, Grover (huge T count)
+    MPS / DMRG              Area-law entanglement    Volume-law entanglement
+    PEPS                    2D locality              Long-range / all-to-all
+    Shallow contraction     Low depth                Deep circuits
+    Circuit cutting         Few cuts suffice         Highly connected circuits
+    Pauli-path truncation   Noise or shallow depth   Coherent deep circuits
+    Dequantization          Low-rank input data      General unitary dynamics
+
+A 2048-qubit computation worth running is, by definition, one that is *not*
+efficiently classically simulable -- otherwise you would just run the classical
+method and skip the refrigerator. Shor's algorithm at cryptographic scale is
+deliberately maximal on every axis in the right-hand column: deep, globally
+entangling via the QFT, enormous non-Clifford count, and volume-law entanglement
+through modular exponentiation. It sits precisely in the gap that every
+FEM-like ansatz leaves open.
+
+3.5 THE ARGUMENT THAT SETTLES IT
+--------------------------------
+There is a cleaner way to see this than enumerating methods, and it does not
+depend on any of them:
+
+  Suppose a FEM-like algorithm existed that let a modest classical machine
+  faithfully reproduce the output distribution of an arbitrary 2048-qubit
+  quantum circuit, with polynomial resources.
+
+  Then BQP would be contained in (roughly) P or BPP. Shor's algorithm would run
+  classically, meaning RSA and ECC would already be broken by that algorithm
+  alone -- no quantum hardware required, and no post-quantum migration would
+  help, since the break would be classical. Simultaneously, every quantum
+  advantage would evaporate and the entire multi-billion-dollar hardware effort
+  would be pointless.
+
+  Exact simulation is stronger still: computing output amplitudes of general
+  quantum circuits is #P-hard, and additive-error sampling from them collapses
+  the polynomial hierarchy under standard assumptions.
+
+The existence of an efficient classical mimic and the usefulness of quantum
+hardware are the *same question* with opposite signs. You cannot have both. So
+"just use a simulator instead of building the machines" is not merely
+impractical -- it is self-refuting. If the shortcut worked, there would be
+nothing on the other side of it to reach.
+
+3.6 WHAT SIMULATORS ARE ACTUALLY FOR
+------------------------------------
+This is where the original intuition ("maybe we don't need to build them") lands
+on something true and useful, just not the thing it aimed at. Simulators are
+indispensable -- every hardware group runs them constantly -- as:
+
+  * algorithm development and debugging, with full state visibility that no
+    real device can offer
+  * verification: a classically-checkable ground truth to validate hardware
+    output on small instances
+  * noise modeling and error-correction design (Stim exists precisely for
+    simulating enormous Clifford-heavy QEC circuits)
+  * establishing the classical baseline -- the moving line that any quantum
+    advantage claim must clear, which is why the tensor-network and Pauli-path
+    results above matter so much
+
+They are a development and verification tool. They are not a substitute, and the
+sharper point is that they *define* what a substitute would have to beat.
+
+================================================================================
+PART 4 -- BOTTOM LINE
+================================================================================
+
+1. The OP's arithmetic is correct throughout: 69 GB at 32 qubits, doubling per
+   qubit, 18 TB at 40, 18 PB at 50, 1-in-2.1-billion, 4 Grover queries. The
+   71-second runtime is consistent with memory-bandwidth limits, which supports
+   the claim that the run was real.
+
+2. The headline demonstration does not show what it claims. Z-basis-only
+   all-agree data on a GHZ state is reproduced exactly by copying one classical
+   coin flip into 32 registers. Showing entanglement requires multiple
+   measurement bases (Mermin/GHZ or CHSH); showing nonlocality requires
+   spacelike-separated physical measurements, which no simulation can do.
+
+3. The 69 GB was a tool choice, not a wall. GHZ and single-target Grover are
+   both classically trivial -- Clifford tableau or bond-dimension-2 MPS -- at
+   thousands of qubits on the same laptop. Only Shor's circuit in that set
+   genuinely resists compression.
+
+4. "Beyond ~45 qubits no classical hardware can fake it" is false. Simulability
+   tracks entanglement, magic, depth, and noise -- not qubit count. Noisy
+   circuits in particular have proven far more classically tractable than
+   expected, as the IBM 127-qubit utility episode showed.
+
+5. A 32-qubit simulator cannot mimic a general 2048-qubit machine by any
+   algorithm. FEM works because the domain dimension is fixed at 3 and the
+   solution is smooth; here the effective dimension grows with qubit count, and
+   at n = 2048 the state vector would need ~10^618 bytes against ~10^80 atoms in
+   the universe.
+
+6. The FEM instinct is nonetheless correct in form. Tensor networks are exactly
+   that idea -- bond dimension as mesh refinement, area law as smoothness -- and
+   they are the state of the art, reaching thousands of qubits when the
+   entanglement cooperates. They fail on precisely the circuits that make
+   quantum hardware worth building.
+
+7. The decisive argument is a dilemma, not a resource count: an efficient
+   classical mimic of arbitrary quantum circuits would break RSA classically and
+   render all quantum hardware pointless in one stroke. The shortcut cannot
+   exist without destroying the destination.
+
+8. The OP's practical recommendation stands and is the most actionable item in
+   the whole exchange: begin post-quantum cryptography migration now. The
+   standards are final (FIPS 203/204/205), the driver is harvest-now-decrypt-
+   later against long-lived secrets, and migration timelines for large
+   organizations run to years -- so the decision does not depend on resolving
+   the hardware-timeline disagreement at all.
+
+================================================================================
+END OF ANALYSIS
+================================================================================
