@@ -2672,7 +2672,7 @@ static bool isCloudModel(const QString &model) {
 
 static void appendCloudLiveStatus(const QJsonObject &event, const QString &referenceConfigId) {
     QDir().mkpath(kOutDir);
-    static const QString runStamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    static const QString runStamp = QDateTime::currentDateTime().toString("yyyyMMdd");
     const QString jsonlPath = kOutDir + "/aih_v4_pass2_live_cloud_status_" + runStamp + ".jsonl";
     const QString mdPath = kOutDir + "/aih_v4_pass2_live_cloud_status_" + runStamp + ".md";
     QJsonObject row;
