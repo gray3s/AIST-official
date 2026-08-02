@@ -12,19 +12,19 @@
     <p>The local default maxply has been raised and the local/cloud maxply multiplier range is 2x to 4x.</p>
     <h2>Current default run controls</h2>
     <ul>
-      <li>Local retry/expand/full-local default maxply: 40</li>
-      <li>Cloud provider-key default maxply: 10, derived from local maxply / ratio</li>
-      <li>Local maxply cap: 40</li>
-      <li>Cloud maxply cap: 10</li>
+      <li>Local retry/expand/full-local default maxply: 80</li>
+      <li>Cloud provider-key default maxply: 20, derived from local maxply / ratio</li>
+      <li>Local maxply cap: 80</li>
+      <li>Cloud maxply cap: 20</li>
       <li>Default local/cloud maxply multiplier: 4x</li>
       <li>Allowed local/cloud maxply multiplier range: 2x to 4x</li>
       <li>CLI controls: <code>--local-maxplys=N</code>, <code>--local-cloud-maxply-ratio=N</code></li>
     </ul>
     <h2>Latest binary-published summary</h2>
-    <p class="note">Source summary: <code>runs/aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_20260729_161901_summary.md</code></p>
+    <p class="note">Source summary: <code>runs/aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_20260802_142954_summary.md</code></p>
     <table>
       <thead><tr><th>Model</th><th>Mode</th><th>Termination</th><th>Completed game</th><th>Plies</th><th>Legal moves</th><th>Failed turns</th><th>Rejected attempts</th><th>Elapsed s</th></tr></thead>
-      <tbody><tr><td>granite4:3b vs qwen2.5-coder:3b</td><td>aichess_hallucination_game</td><td>white_forfeit_invalid_or_unparseable_move</td><td>false</td><td>4</td><td>4</td><td>1</td><td>3</td><td>103.735</td></tr></tbody>
+      <tbody><tr><td>gemini:gemini-3.1-flash-lite vs gemini:gemini-3.1-flash-lite</td><td>aichess_hallucination_game</td><td>draw_by_configured_ply_limit</td><td>false</td><td>20</td><td>20</td><td>0</td><td>0</td><td>33.213</td></tr></tbody>
     </table>
     <h2>Preliminary interpretation</h2>
     <p>The latest preliminary row is generated locally by successful <code>bin/aih_v4</code> runs from the newest v4 run summary.</p>

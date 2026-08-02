@@ -30,7 +30,7 @@
 
 static const QString kTestId = "aichess_v4_pairwise_prototype_20260729";
 static const QString kOutDir =
-    "/home/sag/RPA2/myLLC/AI/brilliance/aih/aichess/v4/runs/"
+    "/home/sag/RPA2/myLLC/AIST-official/AIH-v4/runs/"
     "aih_v4_pairwise_prototype_20260729";
 static const QString kStockfishPath = "/usr/games/stockfish";
 static const QString kOllamaPath = "/usr/local/bin/ollama";
@@ -48,6 +48,8 @@ struct OllamaResult {
     QString stderrText;
     bool backendDone = false;
     QString doneReason;
+    QJsonObject providerQuotaHeaders;
+    QJsonObject providerQuotaSummary;
 };
 
 struct DetPiece {
@@ -119,6 +121,71 @@ static QString traceSha256(const QString &text) {
 
 static QString traceSha(const QString &text) {
     return traceSha256(text).left(12);
+}
+
+static QJsonObject filteredQuotaHeaders(QNetworkReply *reply) {
+    QJsonObject obj;
+    const QList<QNetworkReply::RawHeaderPair> pairs = reply->rawHeaderPairs();
+    for (const QNetworkReply::RawHeaderPair &pair : pairs) {
+        const QString key = QString::fromLatin1(pair.first).toLower();
+        if (key.startsWith("x-ratelimit-") ||
+            key.startsWith("ratelimit") ||
+            key == "retry-after" ||
+            key.startsWith("openai-") ||
+            key == "x-request-id" ||
+            key.startsWith("anthropic-ratelimit-") ||
+            key.startsWith("anthropic-priority-") ||
+            key == "anthropic-request-id" ||
+            key.startsWith("x-goog-")) {
+            obj[key] = QString::fromLatin1(pair.second);
+        }
+    }
+    return obj;
+}
+
+static double headerPct(const QJsonObject &headers, const QString &remainingName, const QString &limitName) {
+    bool remainingOk = false;
+    bool limitOk = false;
+    const double remaining = headers.value(remainingName).toString().toDouble(&remainingOk);
+    const double limit = headers.value(limitName).toString().toDouble(&limitOk);
+    if (!remainingOk || !limitOk || limit <= 0.0) {
+        return -1.0;
+    }
+    return (remaining / limit) * 100.0;
+}
+
+static QJsonObject quotaSummaryForProvider(const QString &provider, const QJsonObject &headers) {
+    QJsonObject obj;
+    if (provider == "openai") {
+        const double requestPct = headerPct(headers, "x-ratelimit-remaining-requests", "x-ratelimit-limit-requests");
+        const double tokenPct = headerPct(headers, "x-ratelimit-remaining-tokens", "x-ratelimit-limit-tokens");
+        if (requestPct >= 0.0) obj["requests_remaining_pct"] = requestPct;
+        if (tokenPct >= 0.0) obj["tokens_remaining_pct"] = tokenPct;
+        if (headers.contains("x-ratelimit-remaining-requests")) obj["requests_remaining"] = headers.value("x-ratelimit-remaining-requests");
+        if (headers.contains("x-ratelimit-remaining-tokens")) obj["tokens_remaining"] = headers.value("x-ratelimit-remaining-tokens");
+        if (headers.contains("x-ratelimit-reset-requests")) obj["requests_reset"] = headers.value("x-ratelimit-reset-requests");
+        if (headers.contains("x-ratelimit-reset-tokens")) obj["tokens_reset"] = headers.value("x-ratelimit-reset-tokens");
+    } else if (provider == "anthropic") {
+        const double requestPct = headerPct(headers, "anthropic-ratelimit-requests-remaining", "anthropic-ratelimit-requests-limit");
+        const double tokenPct = headerPct(headers, "anthropic-ratelimit-tokens-remaining", "anthropic-ratelimit-tokens-limit");
+        const double inputPct = headerPct(headers, "anthropic-ratelimit-input-tokens-remaining", "anthropic-ratelimit-input-tokens-limit");
+        const double outputPct = headerPct(headers, "anthropic-ratelimit-output-tokens-remaining", "anthropic-ratelimit-output-tokens-limit");
+        if (requestPct >= 0.0) obj["requests_remaining_pct"] = requestPct;
+        if (tokenPct >= 0.0) obj["tokens_remaining_pct"] = tokenPct;
+        if (inputPct >= 0.0) obj["input_tokens_remaining_pct"] = inputPct;
+        if (outputPct >= 0.0) obj["output_tokens_remaining_pct"] = outputPct;
+        if (headers.contains("anthropic-ratelimit-tokens-remaining")) obj["tokens_remaining"] = headers.value("anthropic-ratelimit-tokens-remaining");
+        if (headers.contains("anthropic-ratelimit-tokens-reset")) obj["tokens_reset"] = headers.value("anthropic-ratelimit-tokens-reset");
+    }
+    if (headers.contains("retry-after")) {
+        obj["retry_after"] = headers.value("retry-after");
+    }
+    return obj;
+}
+
+static void captureProviderQuotaStatus(OllamaResult *result, const QString &provider, QNetworkReply *reply) {
+    result->providerQuotaHeaders = filteredQuotaHeaders(reply);
+    result->providerQuotaSummary = quotaSummaryForProvider(provider, result->providerQuotaHeaders);
 }
 
 static QString readTextFile(const QString &path) {
@@ -1862,6 +1929,7 @@ static OllamaResult askOllama(const QString &model,
     }
 
     const QByteArray body = reply->readAll();
+    captureProviderQuotaStatus(&result, "openai", reply);
     if (reply->error() != QNetworkReply::NoError) {
         result.status = "request_failed";
         result.elapsedSeconds = timer.elapsed() / 1000.0;
@@ -1957,6 +2025,7 @@ static OllamaResult askOpenAi(const QString &model,
     }
 
     const QByteArray body = reply->readAll();
+    captureProviderQuotaStatus(&result, "gemini", reply);
     if (reply->error() != QNetworkReply::NoError) {
         result.status = "request_failed";
         result.exitCode = int(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
@@ -2168,6 +2237,7 @@ static OllamaResult askGeminiGenerateContent(const QString &model,
     }
 
     const QByteArray body = reply->readAll();
+    captureProviderQuotaStatus(&result, "anthropic", reply);
     if (reply->error() != QNetworkReply::NoError) {
         result.status = "request_failed";
         result.exitCode = int(reply->attribute(QNetworkRequest::HttpStatusCodeAttribute).toInt());
@@ -2587,7 +2657,72 @@ static QJsonObject ollamaJson(const OllamaResult &result) {
     obj["stderr"] = result.stderrText;
     obj["backend_done"] = result.backendDone;
     obj["done_reason"] = result.doneReason;
+    if (!result.providerQuotaHeaders.isEmpty()) {
+        obj["provider_quota_headers"] = result.providerQuotaHeaders;
+    }
+    if (!result.providerQuotaSummary.isEmpty()) {
+        obj["provider_quota_summary"] = result.providerQuotaSummary;
+    }
     return obj;
+}
+
+static bool isCloudModel(const QString &model) {
+    return isOpenAiModel(model) || isGeminiModel(model) || isAnthropicModel(model);
+}
+
+static void appendCloudLiveStatus(const QJsonObject &event, const QString &referenceConfigId) {
+    QDir().mkpath(kOutDir);
+    static const QString runStamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    const QString jsonlPath = kOutDir + "/aih_v4_pass2_live_cloud_status_" + runStamp + ".jsonl";
+    const QString mdPath = kOutDir + "/aih_v4_pass2_live_cloud_status_" + runStamp + ".md";
+    QJsonObject row;
+    row["timestamp"] = QDateTime::currentDateTime().toString(Qt::ISODate);
+    row["reference_config_id"] = referenceConfigId;
+    row["board"] = event.value("brdid").toString();
+    row["ply"] = event.value("ply").toInt();
+    row["side_to_move"] = event.value("side_to_move").toString();
+    row["role"] = event.value("role").toString();
+    row["model"] = event.value("model").toString();
+    row["response_failure_class"] = event.value("response_failure_class").toString();
+    row["legal"] = event.value("legal").toBool();
+    row["parsed_uci"] = event.value("parsed_uci").toString();
+    row["move_to_referee_elapsed_s"] = event.value("move_to_referee_elapsed_s").toDouble();
+    const QJsonObject response = event.value("response").toObject();
+    row["response_status"] = response.value("status").toString();
+    row["http_status"] = response.value("exit_code").toInt();
+    row["provider_quota_summary"] = response.value("provider_quota_summary").toObject();
+    row["provider_quota_headers"] = response.value("provider_quota_headers").toObject();
+
+    QFile jsonl(jsonlPath);
+    if (jsonl.open(QIODevice::Append | QIODevice::Text)) {
+        jsonl.write(QJsonDocument(row).toJson(QJsonDocument::Compact));
+        jsonl.write("\n");
+        jsonl.close();
+    }
+
+    QFile md(mdPath);
+    if (md.open(QIODevice::WriteOnly | QIODevice::Text)) {
+        QTextStream out(&md);
+        out << "# AIH v4 Pass2 Live Cloud Status\n\n";
+        out << "Updated: " << QDateTime::currentDateTime().toString(Qt::ISODate) << "\n\n";
+        out << "This timestamped file is rewritten after each cloud agent reply. Full history is in `"
+            << QFileInfo(jsonlPath).fileName() << "`.\n\n";
+        out << "| Board | Ply | Model | Response | Failure class | Legal | Move | Requests remaining % | Tokens remaining % | Retry after |\n";
+        out << "| --- | ---: | --- | --- | --- | --- | --- | ---: | ---: | --- |\n";
+        const QJsonObject quota = row.value("provider_quota_summary").toObject();
+        out << "| " << row.value("board").toString()
+            << " | " << row.value("ply").toInt()
+            << " | " << row.value("model").toString()
+            << " | " << row.value("response_status").toString()
+            << " | " << row.value("response_failure_class").toString()
+            << " | " << (row.value("legal").toBool() ? "true" : "false")
+            << " | " << row.value("parsed_uci").toString()
+            << " | " << (quota.contains("requests_remaining_pct") ? QString::number(quota.value("requests_remaining_pct").toDouble(), 'f', 3) : QString())
+            << " | " << (quota.contains("tokens_remaining_pct") ? QString::number(quota.value("tokens_remaining_pct").toDouble(), 'f', 3) : QString())
+            << " | " << quota.value("retry_after").toString()
+            << " |\n";
+        md.close();
+    }
 }
 
 static QJsonObject runOneMove(const QString &model, int moveTimeoutSeconds, int stackTimeoutSeconds, int numPredict) {
@@ -3614,6 +3749,9 @@ static QJsonObject runBoardGame(int boardIndex,
         event["referee_vote_rule"] = "majority";
         event["referee_votes"] = refereeVotes;
         event["move_to_referee_elapsed_s"] = evaluationTimer.elapsed() / 1000.0;
+        if (isCloudModel(activeModel)) {
+            appendCloudLiveStatus(event, referenceConfigId);
+        }
 
         const QString plyPrefix = QString("%1: P%2 %3")
             .arg(boardLabel)

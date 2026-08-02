@@ -9,21 +9,21 @@ https://htmlpreview.github.io/?https://github.com/gray3s/brilliance/blob/main/ai
 
 ## Current default run controls
 
-- Local retry/expand/full-local default maxply: 40
-- Cloud provider-key default maxply: 10, derived from local maxply / ratio
-- Local maxply cap: 40
-- Cloud maxply cap: 10
+- Local retry/expand/full-local default maxply: 80
+- Cloud provider-key default maxply: 20, derived from local maxply / ratio
+- Local maxply cap: 80
+- Cloud maxply cap: 20
 - Default local/cloud maxply multiplier: 4x
 - Allowed local/cloud maxply multiplier range: 2x to 4x
 - CLI controls: `--local-maxplys=N`, `--local-cloud-maxply-ratio=N`
 
 ## Latest binary-published summary
 
-Source summary: `runs/aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_20260729_161901_summary.md`
+Source summary: `runs/aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_20260802_142954_summary.md`
 
 | Model | Mode | Termination | Completed game | Plies | Legal moves | Failed turns | Rejected attempts | Elapsed s |
 | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| granite4:3b vs qwen2.5-coder:3b | aichess_hallucination_game | white_forfeit_invalid_or_unparseable_move | false | 4 | 4 | 1 | 3 | 103.735 |
+| gemini:gemini-3.1-flash-lite vs gemini:gemini-3.1-flash-lite | aichess_hallucination_game | draw_by_configured_ply_limit | false | 20 | 20 | 0 | 0 | 33.213 |
 
 ## Preliminary interpretation
 
