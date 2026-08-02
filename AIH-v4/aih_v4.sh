@@ -7,7 +7,9 @@ LOCAL_AGENT_REGISTRY="${AIH_V4_LOCAL_AGENT_REGISTRY:-$ROOT_DIR/../v3/qualificati
 LOCAL_SMOKE=1
 CLOUD_SMOKE_PROVIDER=""
 SMOKE_STAGE="${AIH_V4_SMOKE_STAGE:-local-retry}"
+AIH_V4_AGENT_SCOPE="${AIH_V4_AGENT_SCOPE:-local}"
 PASSTHRU_ARGS=()
+REQUESTED_DRY_RUN=0
 ENABLE_BOARD_AWARENESS="${AIH_V4_BOARD_AWARENESS_PROBE:-0}"
 ENABLE_REASONING_MATRIX="${AIH_V4_ENABLE_REASONING_MATRIX:-0}"
 REASONING_RANGE="${AIH_V4_ALLOWED_REASONINGS:-${AIH_V4_REASONING_RANGE:-}}"
@@ -20,6 +22,8 @@ AIH_V4_LOCAL_CLOUD_MAXPLY_RATIO="${AIH_V4_LOCAL_CLOUD_MAXPLY_RATIO:-4}"
 AIH_V4_LOCAL_MAXPLY_CAP="${AIH_V4_LOCAL_MAXPLY_CAP:-40}"
 AIH_V4_CLOUD_MAXPLY_CAP="${AIH_V4_CLOUD_MAXPLY_CAP:-10}"
 AIH_V4_ALLOW_KEY_ALIASING="${AIH_V4_ALLOW_KEY_ALIASING:-0}"
+AIH_V4_CLOUD_PROVIDERS="${AIH_V4_CLOUD_PROVIDERS:-all}"
+AIH_V4_MEMORY_MODE="${AIH_V4_MEMORY_MODE:-stateless}"
 
 has_env() {
   local name="$1"
@@ -123,6 +127,33 @@ for arg in "$@"; do
       CLOUD_SMOKE_PROVIDER=""
       SMOKE_STAGE="full-agent-set"
       ;;
+    --agent-scope=*)
+      AIH_V4_AGENT_SCOPE="${arg#*=}"
+      case "$AIH_V4_AGENT_SCOPE" in
+        local)
+          LOCAL_SMOKE=1
+          ;;
+        cloud|both)
+          LOCAL_SMOKE=0
+          SMOKE_STAGE="full-agent-set"
+          ;;
+        *)
+          echo "aih_v4: invalid --agent-scope=$AIH_V4_AGENT_SCOPE" >&2
+          echo "aih_v4: expected local, cloud, or both" >&2
+          exit 2
+          ;;
+      esac
+      ;;
+    --cloud-providers=*|--agent-providers=*|--providers=*)
+      AIH_V4_CLOUD_PROVIDERS="${arg#*=}"
+      ;;
+    --memory-mode=*)
+      AIH_V4_MEMORY_MODE="${arg#*=}"
+      ;;
+    --thought-mode=*)
+      ENABLE_REASONING_MATRIX=1
+      REASONING_RANGE="${arg#*=}"
+      ;;
     --cloud-smoke-openai)
       LOCAL_SMOKE=0
       CLOUD_SMOKE_PROVIDER="openai"
@@ -164,6 +195,10 @@ for arg in "$@"; do
       ;;
     --local-cloud-maxply-ratio=*)
       AIH_V4_LOCAL_CLOUD_MAXPLY_RATIO="${arg#*=}"
+      ;;
+    --dry-run)
+      REQUESTED_DRY_RUN=1
+      PASSTHRU_ARGS+=("$arg")
       ;;
     *)
       PASSTHRU_ARGS+=("$arg")
@@ -433,6 +468,15 @@ validate_verbosity_range() {
   fi
 }
 
+validate_memory_mode() {
+  local mode="$1"
+  if [[ ! "$mode" =~ ^(stateless|match_memory|tournament_memory)$ ]]; then
+    echo "aih_v4: invalid memory mode: $mode" >&2
+    echo "aih_v4: expected stateless, match_memory, or tournament_memory" >&2
+    exit 2
+  fi
+}
+
 discover_local_agents() {
   local registry="$1"
   local discovered=""
@@ -463,7 +507,7 @@ discover_local_agents() {
     printf '%s\n' "$discovered"
     return
   fi
-  ollama list 2>/dev/null | awk '
+  (ollama list 2>/dev/null || true) | awk '
     NR > 1 {
       if (out != "") out = out ","
       out = out $1
@@ -483,6 +527,69 @@ rotate_left_one() {
   first="$(csv_field "$csv" 1)"
   rest="$(csv_range "$csv" 2 "$((n - 1))")"
   printf '%s,%s\n' "$rest" "$first"
+}
+
+csv_pair_whites() {
+  local csv="$1"
+  awk -v s="$csv" '
+    BEGIN {
+      n = split(s, a, ",")
+      out = ""
+      for (i = 1; i + 1 <= n; i += 2) {
+        if (out != "") out = out ","
+        out = out a[i]
+      }
+      print out
+    }'
+}
+
+csv_pair_blacks() {
+  local csv="$1"
+  awk -v s="$csv" '
+    BEGIN {
+      n = split(s, a, ",")
+      out = ""
+      for (i = 2; i <= n; i += 2) {
+        if (out != "") out = out ","
+        out = out a[i]
+      }
+      print out
+    }'
+}
+
+cloud_agents_for_providers() {
+  local providers
+  providers="$(normalize_csv "$1")"
+  if [[ -z "$providers" || "$providers" == "all" ]]; then
+    providers="gemini,openai"
+  fi
+  awk -v providers="$providers" '
+    BEGIN {
+      n = split(providers, p, ",")
+      for (i = 1; i <= n; ++i) {
+        provider = p[i]
+        if (provider == "google") provider = "gemini"
+        if (provider == "gemini") {
+          append("gemini:gemini-3.1-flash-lite")
+        } else if (provider == "openai") {
+          append("openai:gpt-4.1-mini")
+          append("openai:gpt-5-nano")
+        } else if (provider == "anthropic") {
+          append("anthropic:claude-3-5-haiku")
+        } else {
+          invalid = invalid (invalid == "" ? "" : ",") provider
+        }
+      }
+      if (invalid != "") {
+        print "INVALID:" invalid
+      } else {
+        print out
+      }
+    }
+    function append(agent) {
+      if (out != "") out = out ","
+      out = out agent
+    }'
 }
 
 reject_cloud_agent_spec() {
@@ -526,7 +633,18 @@ if [[ -n "$CLOUD_SMOKE_PROVIDER" ]]; then
   export AICHESS_OPENAI_TEXT_VERBOSITY="${AICHESS_OPENAI_TEXT_VERBOSITY:-medium}"
   AIH_V4_REFERENCE_CONFIG="${AIH_V4_REFERENCE_CONFIG:-aih_v4_cloud_provider_key_smoke_${CLOUD_SMOKE_PROVIDER}_medium_20260729}"
 else
-  if [[ "$SMOKE_STAGE" == "full-agent-set" ]]; then
+  case "$AIH_V4_AGENT_SCOPE" in
+    local|cloud|both)
+      ;;
+    *)
+      echo "aih_v4: invalid AIH_V4_AGENT_SCOPE=$AIH_V4_AGENT_SCOPE" >&2
+      echo "aih_v4: expected local, cloud, or both" >&2
+      exit 2
+      ;;
+  esac
+  if [[ "$SMOKE_STAGE" == "full-agent-set" && -n "${AIH_V4_WHITE_MODELS:-}" && -n "${AIH_V4_BLACK_MODELS:-}" ]]; then
+    prepare_keys_for_specs "${AIH_V4_WHITE_MODELS},${AIH_V4_BLACK_MODELS},${AIH_V4_REFEREE_MODELS:-harness},${PASSTHRU_ARGS[*]}"
+  elif [[ "$SMOKE_STAGE" == "full-agent-set" && "$AIH_V4_AGENT_SCOPE" == "local" ]]; then
     if [[ -z "${AIH_V4_WHITE_MODELS:-}" || -z "${AIH_V4_BLACK_MODELS:-}" ]]; then
       echo "aih_v4: full-agent-set requires explicit AIH_V4_WHITE_MODELS and AIH_V4_BLACK_MODELS." >&2
       echo "aih_v4: this prevents accidentally treating the local Ollama cache as the full v4 roster." >&2
@@ -534,7 +652,17 @@ else
     fi
     prepare_keys_for_specs "${AIH_V4_WHITE_MODELS},${AIH_V4_BLACK_MODELS},${AIH_V4_REFEREE_MODELS:-harness},${PASSTHRU_ARGS[*]}"
   fi
-  LOCAL_AGENTS="$(discover_local_agents "$LOCAL_AGENT_REGISTRY")"
+  if [[ "$AIH_V4_AGENT_SCOPE" == "cloud" ]]; then
+    LOCAL_AGENTS=""
+  else
+    LOCAL_AGENTS="$(discover_local_agents "$LOCAL_AGENT_REGISTRY")"
+  fi
+  CLOUD_AGENTS="${AIH_V4_CLOUD_AGENTS:-$(cloud_agents_for_providers "$AIH_V4_CLOUD_PROVIDERS")}"
+  if [[ "$CLOUD_AGENTS" == INVALID:* ]]; then
+    echo "aih_v4: invalid cloud provider(s): ${CLOUD_AGENTS#INVALID:}" >&2
+    echo "aih_v4: expected openai, gemini/google, anthropic, or all" >&2
+    exit 2
+  fi
   LOCAL_AGENT_COUNT="$(csv_count "$LOCAL_AGENTS")"
   PAIR_START="${AIH_V4_LOCAL_PAIR_START:-1}"
   PAIR_COUNT="${AIH_V4_LOCAL_PAIR_COUNT:-1}"
@@ -548,9 +676,48 @@ else
     PAIR_START="$LOCAL_AGENT_COUNT"
   fi
 
-  DEFAULT_WHITE_MODELS="${AIH_V4_WHITE_MODELS:-$(csv_range "$LOCAL_AGENTS" "$PAIR_START" "$PAIR_COUNT")}"
-  DEFAULT_BLACK_MODELS="${AIH_V4_BLACK_MODELS:-$(csv_range "$(rotate_left_one "$LOCAL_AGENTS")" "$PAIR_START" "$PAIR_COUNT")}"
-  DEFAULT_BOARDS="${AIH_V4_BOARDS:-$(csv_count "$DEFAULT_WHITE_MODELS")}"
+  case "$AIH_V4_AGENT_SCOPE" in
+    local)
+      DEFAULT_WHITE_MODELS="${AIH_V4_WHITE_MODELS:-$(csv_range "$LOCAL_AGENTS" "$PAIR_START" "$PAIR_COUNT")}"
+      DEFAULT_BLACK_MODELS="${AIH_V4_BLACK_MODELS:-$(csv_range "$(rotate_left_one "$LOCAL_AGENTS")" "$PAIR_START" "$PAIR_COUNT")}"
+      ;;
+    cloud)
+      prepare_keys_for_specs "$CLOUD_AGENTS,${AIH_V4_REFEREE_MODELS:-harness},${PASSTHRU_ARGS[*]}"
+      DEFAULT_WHITE_MODELS="${AIH_V4_WHITE_MODELS:-$(csv_pair_whites "$CLOUD_AGENTS")}"
+      DEFAULT_BLACK_MODELS="${AIH_V4_BLACK_MODELS:-$(csv_pair_blacks "$CLOUD_AGENTS")}"
+      ;;
+    both)
+      COMBINED_AGENTS="$LOCAL_AGENTS,$CLOUD_AGENTS"
+      prepare_keys_for_specs "$COMBINED_AGENTS,${AIH_V4_REFEREE_MODELS:-harness},${PASSTHRU_ARGS[*]}"
+      DEFAULT_WHITE_MODELS="${AIH_V4_WHITE_MODELS:-$(csv_pair_whites "$COMBINED_AGENTS")}"
+      DEFAULT_BLACK_MODELS="${AIH_V4_BLACK_MODELS:-$(csv_pair_blacks "$COMBINED_AGENTS")}"
+      ;;
+  esac
+  DEFAULT_WHITE_COUNT="$(csv_count "$DEFAULT_WHITE_MODELS")"
+  DEFAULT_BLACK_COUNT="$(csv_count "$DEFAULT_BLACK_MODELS")"
+  if ((DEFAULT_BLACK_COUNT < DEFAULT_WHITE_COUNT)); then
+    DEFAULT_PAIR_COUNT="$DEFAULT_BLACK_COUNT"
+  else
+    DEFAULT_PAIR_COUNT="$DEFAULT_WHITE_COUNT"
+  fi
+  if ((DEFAULT_PAIR_COUNT == 0)) && [[ "$AIH_V4_AGENT_SCOPE" == "cloud" || "$AIH_V4_AGENT_SCOPE" == "both" ]]; then
+    BYE_AGENT="$(csv_field "${AIH_V4_AGENT_SCOPE/cloud/$CLOUD_AGENTS}" 1)"
+    if [[ "$AIH_V4_AGENT_SCOPE" == "both" ]]; then
+      BYE_AGENT="$(csv_field "$COMBINED_AGENTS" 1)"
+    fi
+    echo "aih_v4: roster has no playable pair; bye candidate: $BYE_AGENT" >&2
+    if ((REQUESTED_DRY_RUN == 1)); then
+      exit 0
+    fi
+    echo "aih_v4: add another qualified agent or provider before starting this scope." >&2
+    exit 2
+  fi
+  DEFAULT_BOARDS="${AIH_V4_BOARDS:-$DEFAULT_PAIR_COUNT}"
+  if [[ "$AIH_V4_AGENT_SCOPE" == "cloud" && "$(csv_count "$CLOUD_AGENTS")" != "$((2 * DEFAULT_BOARDS))" ]]; then
+    echo "aih_v4: cloud roster has an unpaired bye candidate: $(csv_field "$CLOUD_AGENTS" "$((2 * DEFAULT_BOARDS + 1))")" >&2
+  elif [[ "$AIH_V4_AGENT_SCOPE" == "both" && "$(csv_count "$COMBINED_AGENTS")" != "$((2 * DEFAULT_BOARDS))" ]]; then
+    echo "aih_v4: combined roster has an unpaired bye candidate: $(csv_field "$COMBINED_AGENTS" "$((2 * DEFAULT_BOARDS + 1))")" >&2
+  fi
   if [[ -z "$DEFAULT_WHITE_MODELS" || -z "$DEFAULT_BLACK_MODELS" || "$DEFAULT_BOARDS" == "0" ]]; then
     echo "aih_v4: no local agents discovered." >&2
     echo "aih_v4: checked registry: $LOCAL_AGENT_REGISTRY" >&2
@@ -653,6 +820,7 @@ REASONING_RANGE="$(normalize_csv "$REASONING_RANGE")"
 VERBOSITY_RANGE="$(normalize_csv "$VERBOSITY_RANGE")"
 validate_reasoning_range "$REASONING_RANGE"
 validate_verbosity_range "$VERBOSITY_RANGE"
+validate_memory_mode "$AIH_V4_MEMORY_MODE"
 
 if ! spec_has_provider openai "$ALL_AGENT_SPECS"; then
   VERBOSITY_RANGE="medium"
@@ -701,6 +869,7 @@ ENGINE_ARGS=(
   --otkns "$DEFAULT_OUTPUT_TOKENS"
   --loglvl "$DEFAULT_LOGLVL"
   --clue-mode "$DEFAULT_CLUE_MODE"
+  --memory-mode "$AIH_V4_MEMORY_MODE"
 )
 
 if [[ "$ENABLE_BOARD_AWARENESS" == "1" || "$ENABLE_BOARD_AWARENESS" == "yes" || "$ENABLE_BOARD_AWARENESS" == "true" ]]; then
@@ -737,7 +906,7 @@ if ((MATRIX_COUNT <= 1)); then
     --reference-config "$DEFAULT_REFERENCE_CONFIG" \
     "${PASSTHRU_ARGS[@]}"
   run_status=$?
-  if ((run_status == 0)); then
+  if ((run_status == 0 && REQUESTED_DRY_RUN == 0)); then
     generate_latest_artifacts
     publish_latest_summary
   fi
@@ -752,7 +921,7 @@ if ((CLOUD_MATRIX_APPLIES == 0)); then
     --reference-config "$DEFAULT_REFERENCE_CONFIG" \
     "${PASSTHRU_ARGS[@]}"
   run_status=$?
-  if ((run_status == 0)); then
+  if ((run_status == 0 && REQUESTED_DRY_RUN == 0)); then
     generate_latest_artifacts
     publish_latest_summary
   fi

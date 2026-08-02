@@ -25,6 +25,7 @@
 #include <QTextStream>
 #include <QTimer>
 #include <QUrl>
+#include <algorithm>
 #include <future>
 #include <vector>
 
@@ -1840,6 +1841,56 @@ static OllamaResult askOllamaWithCurl(const QString &model,
     return result;
 }
 
+static QString stripTerminalControls(QString text) {
+    text.remove(QRegularExpression("\x1B\\[[0-?]*[ -/]*[@-~]"));
+    text.remove(QRegularExpression("[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F\\x7F]"));
+    return text.trimmed();
+}
+
+static OllamaResult askOllamaWithCli(const QString &model,
+                                     const QString &prompt,
+                                     int timeoutSeconds,
+                                     const QElapsedTimer &timer) {
+    OllamaResult result;
+    QProcess process;
+    process.setProgram(kOllamaPath);
+    process.setArguments({"run", model});
+    QProcessEnvironment env = QProcessEnvironment::systemEnvironment();
+    env.insert("TERM", "dumb");
+    env.insert("NO_COLOR", "1");
+    process.setProcessEnvironment(env);
+    process.start();
+    if (!process.waitForStarted(5000)) {
+        result.status = "request_failed";
+        result.stderrText = QString("failed to start ollama CLI for %1: %2").arg(model, process.errorString());
+        result.elapsedSeconds = timer.elapsed() / 1000.0;
+        return result;
+    }
+    process.write(prompt.toUtf8());
+    process.closeWriteChannel();
+    if (!process.waitForFinished(timeoutSeconds * 1000)) {
+        process.kill();
+        process.waitForFinished(3000);
+        result.status = "timed_out";
+        result.stdoutText = stripTerminalControls(QString::fromUtf8(process.readAllStandardOutput()));
+        result.stderrText = stripTerminalControls(QString::fromUtf8(process.readAllStandardError()));
+        result.elapsedSeconds = timer.elapsed() / 1000.0;
+        return result;
+    }
+    result.elapsedSeconds = timer.elapsed() / 1000.0;
+    result.exitCode = process.exitCode();
+    result.stdoutText = stripTerminalControls(QString::fromUtf8(process.readAllStandardOutput()));
+    result.stderrText = stripTerminalControls(QString::fromUtf8(process.readAllStandardError()));
+    if (process.exitStatus() != QProcess::NormalExit || result.exitCode != 0) {
+        result.status = "request_failed";
+        return result;
+    }
+    result.status = "completed";
+    result.backendDone = true;
+    result.doneReason = "ollama_cli_exit_0";
+    return result;
+}
+
 static QString responseOutputText(const QJsonObject &obj) {
     const QString direct = obj.value("output_text").toString().trimmed();
     if (!direct.isEmpty()) {
@@ -1886,11 +1937,12 @@ static OllamaResult askOllama(const QString &model,
     payload["options"] = options;
     const QJsonDocument payloadDoc(payload);
 
-    OllamaResult curlResult = askOllamaWithCurl(model, payloadDoc, timeoutSeconds, timer);
-    logHarnessInput(traceLabel, traceEndpoint, curlResult.stdoutText);
-    return curlResult;
+    OllamaResult cliResult = askOllamaWithCli(model, prompt, timeoutSeconds, timer);
+    logHarnessInput(traceLabel, traceEndpoint, cliResult.stdoutText);
+    return cliResult;
 
     QNetworkAccessManager manager;
+    manager.setProxy(QNetworkProxy::NoProxy);
     QNetworkRequest request(QUrl("http://127.0.0.1:11434/api/generate"));
     request.setHeader(QNetworkRequest::ContentTypeHeader, "application/json");
 
@@ -1936,9 +1988,6 @@ static OllamaResult askOllama(const QString &model,
         result.stderrText = reply->errorString();
         result.stdoutText = QString::fromUtf8(body).trimmed();
         reply->deleteLater();
-        if (result.stdoutText.isEmpty()) {
-            result = askOllamaWithCurl(model, payloadDoc, timeoutSeconds, timer);
-        }
         logHarnessInput(traceLabel, traceEndpoint, result.stdoutText);
         return result;
     }
@@ -3133,6 +3182,7 @@ static QJsonObject runBoardGame(int boardIndex,
                                 bool boardAwarenessProbe,
                                 bool includeLegalMoveList,
                                 const QString &referenceConfigId,
+                                const QString &memoryMode,
                                 const QString &requestedStackModule,
                                 const QString &stackKind,
                                 const QString &stackName) {
@@ -3142,6 +3192,8 @@ static QJsonObject runBoardGame(int boardIndex,
     obj["test_id"] = kTestId;
     obj["mode"] = "aichess_hallucination_game";
     obj["reference_config_id"] = referenceConfigId;
+    obj["memory_mode"] = memoryMode;
+    obj["thought_mode"] = reasoningPerformanceMode();
     obj["rqstkmdl"] = requestedStackModule;
     obj["stktyp"] = stackKind;
     obj["stknm"] = stackName;
@@ -3182,6 +3234,8 @@ static QJsonObject runBoardGame(int boardIndex,
     agentConfiguration["stktyp"] = stackKind;
     agentConfiguration["stknm"] = stackName;
     agentConfiguration["reasoning_performance_mode"] = reasoningPerformanceMode();
+    agentConfiguration["memory_mode"] = memoryMode;
+    agentConfiguration["thought_mode"] = reasoningPerformanceMode();
     agentConfiguration["verbosity"] = openAiTextVerbosity();
     agentConfiguration["openai_reasoning_effort_effective"] = openAiReasoningEffort();
     agentConfiguration["openai_text_verbosity"] = openAiTextVerbosity();
@@ -3928,9 +3982,287 @@ static QJsonObject runBoardGame(int boardIndex,
     return obj;
 }
 
+struct AgentAihStats {
+    QString agent;
+    QString locality;
+    int games = 0;
+    int assignedTurns = 0;
+    int cleanTurns = 0;
+    int visibleHallucinations = 0;
+    int rejectedAttempts = 0;
+    int parserFailures = 0;
+    int illegalMoves = 0;
+    int transportFailures = 0;
+    int timeoutFailures = 0;
+    int quotaFailures = 0;
+    int totalGamePliesBeforeElimination = 0;
+    int worstTerminationSeverity = 0;
+    QString worstTermination = "none";
+    QStringList gameDetails;
+};
+
+static int terminationSeverity(const QString &termination) {
+    const QString t = termination.toLower();
+    if (t == "draw_by_configured_ply_limit" || t == "game_completed" ||
+        t.endsWith("checkmate") || t == "stalemate") {
+        return 0;
+    }
+    if (t.contains("quota_boundary") || t.contains("graceful_quota")) {
+        return 1;
+    }
+    if (t.contains("timeout")) {
+        return 2;
+    }
+    if (t.contains("unparseable") || t.contains("invalid")) {
+        return 3;
+    }
+    if (t.contains("illegal")) {
+        return 4;
+    }
+    if (t.contains("quota") || t.contains("resource_exhausted") || t.contains("token")) {
+        return 5;
+    }
+    if (t.contains("transport") || t.contains("authorization") || t.contains("provider_key") ||
+        t.contains("availability")) {
+        return 5;
+    }
+    return 6;
+}
+
+static QString severityLabel(int severity) {
+    switch (severity) {
+    case 0:
+        return "clean configured stop";
+    case 1:
+        return "graceful quota stop";
+    case 2:
+        return "timeout";
+    case 3:
+        return "parser or invalid response";
+    case 4:
+        return "illegal move or board-state hallucination";
+    case 5:
+        return "hard quota, token, authorization, or transport failure";
+    default:
+        return "unrecoverable or unknown failure";
+    }
+}
+
+static bool terminationBelongsToSide(const QString &termination, const QString &side) {
+    return termination.toLower().startsWith(side.toLower() + "_");
+}
+
+static void addAgentGameStats(QMap<QString, AgentAihStats> *stats,
+                              const QString &agent,
+                              const QString &side,
+                              const QString &boardId,
+                              const QJsonObject &result) {
+    if (agent.isEmpty()) {
+        return;
+    }
+    AgentAihStats &s = (*stats)[agent];
+    s.agent = agent;
+    s.locality = isCloudModel(agent) ? "cloud" : "local";
+    s.games += 1;
+
+    int assignedTurns = 0;
+    int cleanTurns = 0;
+    int visibleHallucinations = 0;
+    int rejectedAttempts = 0;
+    int parserFailures = 0;
+    int illegalMoves = 0;
+    int transportFailures = 0;
+    int timeoutFailures = 0;
+    int quotaFailures = 0;
+    int previousRejected = 0;
+    const QJsonArray events = result.value("events").toArray();
+    for (const QJsonValue &value : events) {
+        const QJsonObject event = value.toObject();
+        if (event.value("side_to_move").toString() != side ||
+            event.value("model").toString() != agent) {
+            continue;
+        }
+        assignedTurns += 1;
+        const int cumulativeRejected = event.value("rejected_move_total").toInt();
+        const int rejectedThisTurn = qMax(0, cumulativeRejected - previousRejected);
+        previousRejected = cumulativeRejected;
+        rejectedAttempts += rejectedThisTurn;
+        const QString error = event.value("error").toString();
+        const QString responseFailureClass = event.value("response_failure_class").toString();
+        const QJsonObject response = event.value("response").toObject();
+        const QString responseStatus = response.value("status").toString();
+        const bool legalByRules = event.value("legal_by_rules").toBool();
+        const bool legalByReferee = event.value("legal_by_referee_vote").toBool();
+        const bool completedResponse = responseStatus == "completed";
+        const int correctionRetriesUsed = event.value("correction_retries_used").toInt();
+        bool awarenessFailed = false;
+        const QJsonObject pre = event.value("pre_move_board_awareness").toObject();
+        const QJsonObject post = event.value("post_move_board_awareness").toObject();
+        if (!pre.isEmpty() && (!pre.value("fen_matches").toBool(true) ||
+                              !pre.value("side_matches").toBool(true) ||
+                              !pre.value("occupied_matches").toBool(true))) {
+            awarenessFailed = true;
+        }
+        if (!post.isEmpty() && (!post.value("fen_matches").toBool(true) ||
+                               !post.value("side_matches").toBool(true) ||
+                               !post.value("occupied_matches").toBool(true))) {
+            awarenessFailed = true;
+        }
+        if (error.contains("unparseable") || error.contains("invalid") ||
+            event.value("parsed_uci").toString().isEmpty()) {
+            parserFailures += 1;
+        }
+        if (error.contains("illegal") || (!legalByRules && !event.value("parsed_uci").toString().isEmpty())) {
+            illegalMoves += 1;
+        }
+        if (event.value("transport_failure").toBool() ||
+            responseFailureClass.contains("transport") ||
+            responseFailureClass.contains("authorization") ||
+            responseFailureClass.contains("provider_key") ||
+            responseFailureClass.contains("availability")) {
+            transportFailures += 1;
+        }
+        if (responseStatus.contains("timed_out") || responseStatus == "game_timeout" ||
+            error.contains("timeout")) {
+            timeoutFailures += 1;
+        }
+        if (responseFailureClass.contains("quota") ||
+            responseFailureClass.contains("token") ||
+            responseStatus.contains("RESOURCE_EXHAUSTED")) {
+            quotaFailures += 1;
+        }
+        const bool visibleHallucination = !error.isEmpty() ||
+            rejectedThisTurn > 0 ||
+            correctionRetriesUsed > 0 ||
+            !completedResponse ||
+            !legalByRules ||
+            !legalByReferee ||
+            awarenessFailed;
+        if (visibleHallucination) {
+            visibleHallucinations += 1;
+        } else {
+            cleanTurns += 1;
+        }
+    }
+
+    const QString termination = result.value("termination").toString();
+    const int maxPlies = result.value("max_plies").toInt();
+    const int severity = terminationBelongsToSide(termination, side)
+        ? terminationSeverity(termination)
+        : 0;
+    s.assignedTurns += assignedTurns;
+    s.cleanTurns += cleanTurns;
+    s.visibleHallucinations += visibleHallucinations;
+    s.rejectedAttempts += rejectedAttempts;
+    s.parserFailures += parserFailures;
+    s.illegalMoves += illegalMoves;
+    s.transportFailures += transportFailures;
+    s.timeoutFailures += timeoutFailures;
+    s.quotaFailures += quotaFailures;
+    s.totalGamePliesBeforeElimination += assignedTurns;
+    if (severity > s.worstTerminationSeverity) {
+        s.worstTerminationSeverity = severity;
+        s.worstTermination = termination;
+    } else if (s.worstTermination == "none") {
+        s.worstTermination = termination;
+    }
+    s.gameDetails << QString("%1 %2 maxply %3 - %4")
+        .arg(boardId, side, QString::number(maxPlies), termination);
+}
+
+static QList<AgentAihStats> rankAgentsByAihPerformance(const QList<QJsonObject> &results) {
+    QMap<QString, AgentAihStats> stats;
+    for (const QJsonObject &r : results) {
+        const QJsonObject cfg = r.value("agent_configuration").toObject();
+        const QString boardId = r.value("board_id").toString(r.value("brdid").toString("board"));
+        addAgentGameStats(&stats, cfg.value("white_model").toString(r.value("white_model").toString()),
+                          "white", boardId, r);
+        addAgentGameStats(&stats, cfg.value("black_model").toString(r.value("black_model").toString()),
+                          "black", boardId, r);
+    }
+    QList<AgentAihStats> ranked = stats.values();
+    std::sort(ranked.begin(), ranked.end(), [](const AgentAihStats &a, const AgentAihStats &b) {
+        const double aClean = a.assignedTurns > 0 ? double(a.cleanTurns) / double(a.assignedTurns) : 0.0;
+        const double bClean = b.assignedTurns > 0 ? double(b.cleanTurns) / double(b.assignedTurns) : 0.0;
+        if (!qFuzzyCompare(aClean + 1.0, bClean + 1.0)) {
+            return aClean > bClean;
+        }
+        if (a.worstTerminationSeverity != b.worstTerminationSeverity) {
+            return a.worstTerminationSeverity < b.worstTerminationSeverity;
+        }
+        if (a.totalGamePliesBeforeElimination != b.totalGamePliesBeforeElimination) {
+            return a.totalGamePliesBeforeElimination > b.totalGamePliesBeforeElimination;
+        }
+        if (a.visibleHallucinations != b.visibleHallucinations) {
+            return a.visibleHallucinations < b.visibleHallucinations;
+        }
+        if (a.rejectedAttempts != b.rejectedAttempts) {
+            return a.rejectedAttempts < b.rejectedAttempts;
+        }
+        return a.agent < b.agent;
+    });
+    return ranked;
+}
+
+static QString aihImmunityContestOutcome(const QJsonObject &result) {
+    const QJsonObject cfg = result.value("agent_configuration").toObject();
+    QMap<QString, AgentAihStats> gameStats;
+    const QString boardId = result.value("board_id").toString(result.value("brdid").toString("board"));
+    const QString whiteAgent = cfg.value("white_model").toString(result.value("white_model").toString());
+    const QString blackAgent = cfg.value("black_model").toString(result.value("black_model").toString());
+    if (whiteAgent == blackAgent) {
+        return "AIH self-test: no advancement distinction";
+    }
+    const QString termination = result.value("termination").toString();
+    if (terminationBelongsToSide(termination, "white")) {
+        return blackAgent;
+    }
+    if (terminationBelongsToSide(termination, "black")) {
+        return whiteAgent;
+    }
+    addAgentGameStats(&gameStats, whiteAgent, "white", boardId, result);
+    addAgentGameStats(&gameStats, blackAgent, "black", boardId, result);
+    QList<AgentAihStats> ranked = gameStats.values();
+    std::sort(ranked.begin(), ranked.end(), [](const AgentAihStats &a, const AgentAihStats &b) {
+        const double aClean = a.assignedTurns > 0 ? double(a.cleanTurns) / double(a.assignedTurns) : 0.0;
+        const double bClean = b.assignedTurns > 0 ? double(b.cleanTurns) / double(b.assignedTurns) : 0.0;
+        if (!qFuzzyCompare(aClean + 1.0, bClean + 1.0)) {
+            return aClean > bClean;
+        }
+        if (a.worstTerminationSeverity != b.worstTerminationSeverity) {
+            return a.worstTerminationSeverity < b.worstTerminationSeverity;
+        }
+        if (a.totalGamePliesBeforeElimination != b.totalGamePliesBeforeElimination) {
+            return a.totalGamePliesBeforeElimination > b.totalGamePliesBeforeElimination;
+        }
+        if (a.visibleHallucinations != b.visibleHallucinations) {
+            return a.visibleHallucinations < b.visibleHallucinations;
+        }
+        if (a.rejectedAttempts != b.rejectedAttempts) {
+            return a.rejectedAttempts < b.rejectedAttempts;
+        }
+        return a.agent < b.agent;
+    });
+    if (ranked.size() < 2) {
+        return ranked.isEmpty() ? "no_contest" : ranked.first().agent;
+    }
+    const AgentAihStats &a = ranked.at(0);
+    const AgentAihStats &b = ranked.at(1);
+    const double aClean = a.assignedTurns > 0 ? double(a.cleanTurns) / double(a.assignedTurns) : 0.0;
+    const double bClean = b.assignedTurns > 0 ? double(b.cleanTurns) / double(b.assignedTurns) : 0.0;
+    if (qFuzzyCompare(aClean + 1.0, bClean + 1.0) &&
+        a.worstTerminationSeverity == b.worstTerminationSeverity &&
+        a.totalGamePliesBeforeElimination == b.totalGamePliesBeforeElimination &&
+        a.visibleHallucinations == b.visibleHallucinations &&
+        a.rejectedAttempts == b.rejectedAttempts) {
+        return "AIH tie: " + a.agent + " and " + b.agent;
+    }
+    return a.agent;
+}
+
 static void writeOutputs(const QList<QJsonObject> &results) {
     QDir().mkpath(kOutDir);
-    const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd_HHmmss");
+    const QString stamp = QDateTime::currentDateTime().toString("yyyyMMdd");
     const QString jsonlPath = kOutDir + "/" + kTestId + "_" + stamp + ".jsonl";
     const QString summaryPath = kOutDir + "/" + kTestId + "_" + stamp + "_summary.md";
 
@@ -3946,7 +4278,65 @@ static void writeOutputs(const QList<QJsonObject> &results) {
     summary.open(QIODevice::WriteOnly | QIODevice::Text);
     QTextStream out(&summary);
     out << "# " << kTestId << " Summary\n\n";
-    out << "Created: " << QDateTime::currentDateTime().toString(Qt::ISODate) << "\n\n";
+    out << "Created: " << QDateTime::currentDateTime().toString("yyyy-MM-dd") << "\n\n";
+    out << "## AIH Immunity Tournament Advancement\n\n";
+    out << "Tournament levels advance the AIH-immunity winner from each contest into the next level. "
+        << "The advancing agent is selected by immunity to visible/detectable hallucination, "
+        << "not by classical chess win/loss scoring. The AIH-immunity winner is not necessarily "
+        << "the winner under classic chess-tournament considerations.\n\n";
+    out << "| Contest | White agent | Black agent | AIH-immunity winner advancing | Termination | Maxply and reason |\n";
+    out << "| --- | --- | --- | --- | --- | --- |\n";
+    for (const QJsonObject &r : results) {
+        const QJsonObject cfg = r.value("agent_configuration").toObject();
+        const QString boardId = r.value("board_id").toString(r.value("brdid").toString("board"));
+        const QString termination = r.value("termination").toString();
+        out << "| " << boardId
+            << " | " << cfg.value("white_model").toString(r.value("white_model").toString())
+            << " | " << cfg.value("black_model").toString(r.value("black_model").toString())
+            << " | " << aihImmunityContestOutcome(r)
+            << " | `" << termination << "`"
+            << " | maxply " << r.value("max_plies").toInt() << " - " << termination
+            << " |\n";
+    }
+    out << "\n";
+    out << "## AIH Immunity Ranking\n\n";
+    out << "Ranking order: higher clean move percentage, lower worst termination severity, "
+        << "higher total plies before elimination, fewer visible hallucination events, "
+        << "then fewer rejected/correction attempts. Classical chess win/loss scoring is not used.\n\n";
+    out << "| Rank | Agent | Local/cloud | Games | Clean moves | Assigned turns | Clean move % | Visible hallucinations | Worst termination severity | Total plies before elimination | Game maxply and reason |\n";
+    out << "| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |\n";
+    const QList<AgentAihStats> ranked = rankAgentsByAihPerformance(results);
+    int rank = 1;
+    for (const AgentAihStats &s : ranked) {
+        const double cleanPct = s.assignedTurns > 0
+            ? 100.0 * double(s.cleanTurns) / double(s.assignedTurns)
+            : 0.0;
+        out << "| " << rank++
+            << " | " << s.agent
+            << " | " << s.locality
+            << " | " << s.games
+            << " | " << s.cleanTurns
+            << " | " << s.assignedTurns
+            << " | " << QString::number(cleanPct, 'f', 1) << "%"
+            << " | " << s.visibleHallucinations
+            << " | " << s.worstTerminationSeverity << " - " << severityLabel(s.worstTerminationSeverity) << " (`" << s.worstTermination << "`)"
+            << " | " << s.totalGamePliesBeforeElimination
+            << " | " << s.gameDetails.join("<br>")
+            << " |\n";
+    }
+    out << "\n## AIH Hallucination Event Totals\n\n";
+    out << "| Agent | Rejected attempts | Parser failures | Illegal moves | Timeouts | Transport/auth/quota failures |\n";
+    out << "| --- | ---: | ---: | ---: | ---: | ---: |\n";
+    for (const AgentAihStats &s : ranked) {
+        out << "| " << s.agent
+            << " | " << s.rejectedAttempts
+            << " | " << s.parserFailures
+            << " | " << s.illegalMoves
+            << " | " << s.timeoutFailures
+            << " | " << (s.transportFailures + s.quotaFailures)
+            << " |\n";
+    }
+    out << "\n## Game Rows\n\n";
     out << "| Model | Mode | Termination | Completed game | Plies | Legal moves | Failed turns | Rejected attempts | Elapsed s |\n";
     out << "| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |\n";
     for (const QJsonObject &r : results) {
@@ -3987,6 +4377,30 @@ static void writeOutputs(const QList<QJsonObject> &results) {
     }
 }
 
+static QList<QJsonObject> readJsonlResults(const QString &path) {
+    QList<QJsonObject> results;
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly | QIODevice::Text)) {
+        writeStderr(QString("unable to open JSONL input: %1\n").arg(path));
+        return results;
+    }
+    while (!file.atEnd()) {
+        const QByteArray line = file.readLine().trimmed();
+        if (line.isEmpty()) {
+            continue;
+        }
+        QJsonParseError error;
+        const QJsonDocument doc = QJsonDocument::fromJson(line, &error);
+        if (error.error != QJsonParseError::NoError || !doc.isObject()) {
+            writeStderr(QString("skipping malformed JSONL row in %1: %2\n")
+                .arg(path, error.errorString()));
+            continue;
+        }
+        results.append(doc.object());
+    }
+    return results;
+}
+
 int main(int argc, char *argv[]) {
     QCoreApplication app(argc, argv);
     QCommandLineParser parser;
@@ -4019,6 +4433,7 @@ int main(int argc, char *argv[]) {
     QCommandLineOption retriesOpt(QStringList{"cnrtlm"}, "Correction retry limit after illegal/unparseable move", "count", "1");
     QCommandLineOption lookaheadOpt(QStringList{"lkahdlvl", "lokahdlvl"}, "Agent chess look-ahead level requested in the move prompt", "level", "0");
     QCommandLineOption clueModeOpt("clue-mode", "Agent clue mode 0-6. 0=no clue, 1=valid moves, 2=board valid, 3=both, 4=suggested move, 5=expected transition, 6=direct UCI move.", "level", "0");
+    QCommandLineOption memoryModeOpt("memory-mode", "Memory mode recorded for this run: stateless, match_memory, or tournament_memory", "mode", "stateless");
     QCommandLineOption logLevelOpt("loglvl", "Logging verbosity 0-5. 0 is least verbose; 5 is most verbose. Level 1 prints compact module mi/mo records; level 2 prints module output/input mo/mi plus mv and rf strings; level 3 adds diagnostics.", "level", "3");
     QCommandLineOption maxIllegalOpt("max-illegal", "Illegal/unparseable move limit before forfeit", "count", "1");
     QCommandLineOption avbOpt("avb", "Stockfish validates board/rules; referee agent validates moves");
@@ -4026,6 +4441,7 @@ int main(int argc, char *argv[]) {
     QCommandLineOption ansOpt("ans", "Agent-only validation; no Stockfish when no Stockfish validation flag is set");
     QCommandLineOption listModelsOpt("list-models", "List detected Qwen models and exit");
     QCommandLineOption dryRunOpt("dry-run", "Print planned run without invoking Ollama");
+    QCommandLineOption summarizeJsonlOpt("summarize-jsonl", "Regenerate AIH immunity summary/ranking from an existing JSONL run without starting games", "path");
 
     parser.addOption(modeOpt);
     parser.addOption(modelOpt);
@@ -4053,6 +4469,7 @@ int main(int argc, char *argv[]) {
     parser.addOption(retriesOpt);
     parser.addOption(lookaheadOpt);
     parser.addOption(clueModeOpt);
+    parser.addOption(memoryModeOpt);
     parser.addOption(logLevelOpt);
     parser.addOption(maxIllegalOpt);
     parser.addOption(avbOpt);
@@ -4060,6 +4477,7 @@ int main(int argc, char *argv[]) {
     parser.addOption(ansOpt);
     parser.addOption(listModelsOpt);
     parser.addOption(dryRunOpt);
+    parser.addOption(summarizeJsonlOpt);
     parser.addPositionalArgument("agents",
         "Optional one to three agents. 1 agent fills White and Black; 2 agents play randomized colors; 3rd agent is referee.");
     for (int i = 1; i < argc; ++i) {
@@ -4069,6 +4487,15 @@ int main(int argc, char *argv[]) {
     }
     const QStringList cliArgs = normalizeWrapperCliArgs(QCoreApplication::arguments());
     parser.process(cliArgs);
+
+    if (parser.isSet(summarizeJsonlOpt)) {
+        const QList<QJsonObject> results = readJsonlResults(parser.value(summarizeJsonlOpt));
+        if (results.isEmpty()) {
+            return 2;
+        }
+        writeOutputs(results);
+        return 0;
+    }
 
     const QStringList positionalAgents = parser.positionalArguments();
     const bool hasRoleOverride = parser.isSet(whiteOpt) || parser.isSet(blackOpt) || parser.isSet(refereeOpt) ||
@@ -4188,6 +4615,7 @@ int main(int argc, char *argv[]) {
     const int correctionRetries = qMax(0, parser.value(retriesOpt).toInt());
     const int lookaheadLevel = qMax(0, parser.value(lookaheadOpt).toInt());
     const int clueMode = qBound(0, parser.value(clueModeOpt).toInt(), 6);
+    const QString memoryMode = parser.value(memoryModeOpt);
     kLogLevel = qBound(0, parser.value(logLevelOpt).toInt(), 5);
     const int maxIllegal = parser.value(maxIllegalOpt).toInt();
     const int boards = qMax(1, parser.value(boardsOpt).toInt());
@@ -4267,6 +4695,8 @@ int main(int argc, char *argv[]) {
         QJsonObject obj;
         obj["mode"] = mode;
         obj["reference_config_id"] = referenceConfigId;
+        obj["memory_mode"] = memoryMode;
+        obj["thought_mode"] = reasoningPerformanceMode();
         obj["rqstkmdl"] = stackModule;
         obj["stktyp"] = stackKind;
         obj["stknm"] = stackName;
@@ -4326,6 +4756,8 @@ int main(int argc, char *argv[]) {
             assignment["white_stkmdl"] = stackModuleForAgentModel(stackModule, assignment.value("white_model").toString());
             assignment["white_stkmdl_caps"] = stackModuleCapabilities(assignment.value("white_stkmdl").toString());
             assignment["reasoning_performance_mode"] = reasoningPerformanceMode();
+            assignment["memory_mode"] = memoryMode;
+            assignment["thought_mode"] = reasoningPerformanceMode();
             assignment["verbosity"] = openAiTextVerbosity();
             assignment["openai_reasoning_effort_effective"] = openAiReasoningEffort();
             assignment["openai_text_verbosity"] = openAiTextVerbosity();
@@ -4403,6 +4835,7 @@ int main(int argc, char *argv[]) {
                      boardAwarenessProbe,
                      includeLegalMoveList,
                      referenceConfigId,
+                     memoryMode,
                      stackModule,
                      stackKind,
                      stackName,
@@ -4442,6 +4875,7 @@ int main(int argc, char *argv[]) {
                                            boardAwarenessProbe,
                                            includeLegalMoveList,
                                            referenceConfigId,
+                                           memoryMode,
                                            stackModule,
                                            stackKind,
                                            stackName);

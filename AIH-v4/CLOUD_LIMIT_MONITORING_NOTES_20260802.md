@@ -38,6 +38,29 @@ request to each cloud provider and writes JSONL plus Markdown into:
 
 `runs/cloud_agent_limit_probes/`
 
+## Observed 2026-08-02
+
+The non-game probe produced these provider-allocation observations without
+starting a chess game:
+
+| Cloud agent | Probe result | Remaining-limit visibility |
+| --- | --- | --- |
+| `openai:gpt-4.1-mini` | HTTP 200 | Usable request and token remaining percentages were observed from rate-limit headers. |
+| `openai:gpt-5-nano` | HTTP 200 | The request completed, but no usable remaining-limit headers were observed in that response. |
+| `gemini:gemini-3.1-flash-lite` | HTTP 200 | The request completed and returned token usage metadata, but no weekly-limit remaining percentage or usable quota-remaining header was observed. |
+| `anthropic:claude-3-5-haiku` | HTTP 401 | The configured key failed authorization, so no remaining-limit status could be measured. |
+
+The Anthropic result means a key value was present and sent, but the provider
+rejected it as invalid. AIH v4 should record this as
+`cloud_authorization_or_entitlement_failure` and exclude that Anthropic agent
+from the daily AIH-immunity ranking until the key or entitlement issue is fixed.
+
+The pass2 Gemini chess run also recorded no usable Gemini quota-remaining
+headers after cloud-agent replies. For Gemini, AIH v4 can currently record
+token usage and treat 429 `RESOURCE_EXHAUSTED` as a stop signal, but it cannot
+enforce a preemptive "5% weekly limit remaining" boundary from observed response
+headers alone.
+
 ## Tournament Stop Boundary
 
 Recommended configuration name:

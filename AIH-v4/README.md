@@ -26,6 +26,38 @@ The current work items are:
   illegal moves, rejected attempts, transport failures, timing, and failure
   classes.
 
+## The Disaster That Is AI Hallucination
+
+AIH v4 treats hallucination as an operational failure mode that has to be
+measured while an agent is trying to act, not merely discussed after a chatbot
+answer looks suspicious. The chess harness is not intended to rank classical
+chess strength. It gives each agent a constrained task where visible failure can
+be detected: produce a parseable legal move, continue participating, and avoid
+inventing board state, impossible moves, irrelevant answers, or broken
+termination behavior.
+
+The current pass2 framing is deliberately practical:
+
+- Start with the highest clue mode while the test itself is being burned in.
+- Rank agents by AIH immunity: clean move percentage, severity of visible
+  hallucination or termination, and total tournament plies before failure.
+- Keep cloud token limits, rejected keys, missing quota visibility, and local
+  runtime behavior in the result instead of hiding them.
+- Classify token exhaustion and authorization failures separately from agent
+  hallucination.
+- Preserve live summaries so a token interruption does not erase the run.
+
+Current pass2 burn-in controls:
+
+- `clue_mode`: `6`
+- `memory_mode`: `stateless`
+- `thought_mode`: `medium`
+- `local/cloud maxply ratio`: `4x`
+
+The immediate result is not a claim that any agent is generally safe. It is a
+repeatable way to show how an agent behaves under observable constraints, and to
+keep the evidence when the behavior breaks.
+
 ## LinkedIn Context
 
 The current public discussion is tracked in these LinkedIn posts:

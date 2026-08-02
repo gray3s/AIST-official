@@ -7,10 +7,14 @@
 - Cloud maxply target: 20
 - Local maxply base target: 80
 - Local/cloud multiplier: 4
+- Clue mode: 6
+- Memory mode: `stateless`
+- Thought mode: `medium`
 - Cloud provider tested in tournament run: Gemini
 - Models: `gemini:gemini-3.1-flash-lite` as white and black
 - Referee: harness rules referee
 - Token-interruption objective: preserve live cloud status after each cloud reply and identify whether provider quota feedback is available before starting longer mixed-agent games.
+- Ranking objective: rank agents by AIH immunity, meaning the ability to keep playing chess with minimal visible/detectable hallucination. Classical chess win/loss scoring is not used to decide AIH v4 advancement.
 
 ## Result
 
@@ -21,7 +25,28 @@
 This pass2 run reached the configured 20-ply cloud boundary without a token,
 quota, transport, parser, or illegal-move failure.
 
-## Agent Performance
+## AIH Immunity Tournament Advancement
+
+Tournament levels advance the AIH-immunity winner from each contest into the
+next level. The advancing agent is selected by immunity to visible/detectable
+hallucination, not by classical chess win/loss scoring. The AIH-immunity winner
+is not necessarily the winner under classic chess-tournament considerations.
+
+| Contest | White agent | Black agent | AIH-immunity winner advancing | Termination | Maxply and reason |
+| --- | --- | --- | --- | --- | --- |
+| `board_1` | `gemini:gemini-3.1-flash-lite` | `gemini:gemini-3.1-flash-lite` | AIH self-test: no advancement distinction | `draw_by_configured_ply_limit` | maxply 20 - draw by configured ply limit |
+
+## AIH Immunity Ranking
+
+Ranking order: higher clean move percentage, lower worst termination severity,
+higher total plies before elimination, fewer visible hallucination events, then
+fewer rejected/correction attempts.
+
+| Rank | Agent name | Local or cloud | Games | Clean moves | Assigned turns | Clean move % | Visible hallucinations | Worst termination severity | Total plies before elimination | Game maxply and reason |
+| ---: | --- | --- | ---: | ---: | ---: | ---: | ---: | --- | ---: | --- |
+| 1 | `gemini:gemini-3.1-flash-lite` | cloud | 2 | 20 | 20 | 100.0% | 0 | 0 - clean configured stop (`draw_by_configured_ply_limit`) | 20 | `board_1` white maxply 20 - draw by configured ply limit<br>`board_1` black maxply 20 - draw by configured ply limit |
+
+## Agent Performance Details
 
 | Agent name | Local or cloud | Agent performance | AIH performance | Game maxply and reason | Game result |
 | --- | --- | --- | --- | --- | --- |
@@ -41,12 +66,16 @@ not expose a usable percentage of weekly limit remaining in response headers.
 - Gemini `gemini-3.1-flash-lite` completed, but returned no quota remaining
   headers in the observed response. It did return token usage metadata.
 - Anthropic `claude-3-5-haiku` returned `401` with an invalid API key message.
+  AIH v4 detected that the configured Anthropic key was rejected by the
+  provider. This is classified as a cloud authorization or entitlement failure,
+  not as an AIH hallucination or agent performance loss.
 
 The practical consequence is that AIH v4 can currently enforce a percentage
 stop-boundary from observed headers for OpenAI `gpt-4.1-mini`, can record
 missing headers for Gemini, and should treat Gemini 429 `RESOURCE_EXHAUSTED`
 responses as the available stop signal unless a separate Google quota API or
-dashboard export is added.
+dashboard export is added. Anthropic should remain excluded from daily
+AIH-immunity rankings until the rejected key condition is resolved.
 
 ## Date-Stamped Artifacts
 
@@ -56,3 +85,5 @@ dashboard export is added.
 - Live cloud status JSONL: `aih_v4_pairwise_prototype_20260729/aih_v4_pass2_live_cloud_status_20260802.jsonl`
 - Cloud limit probe Markdown: `cloud_agent_limit_probes/cloud_agent_limit_probe_20260802.md`
 - Cloud limit probe JSONL: `cloud_agent_limit_probes/cloud_agent_limit_probe_20260802.jsonl`
+- Local burn-in summary: `aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_local_burnin_20260802_summary.md`
+- Local burn-in JSONL: `aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_local_burnin_20260802.jsonl`
