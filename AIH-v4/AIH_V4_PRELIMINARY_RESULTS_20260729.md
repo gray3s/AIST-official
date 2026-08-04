@@ -9,23 +9,40 @@ https://htmlpreview.github.io/?https://github.com/gray3s/brilliance/blob/main/ai
 
 ## Current default run controls
 
-- Local retry/expand/full-local default maxply: 80
-- Cloud provider-key default maxply: 20, derived from local maxply / ratio
-- Local maxply cap: 80
-- Cloud maxply cap: 20
+- Local retry/expand/default local maxply: 50
+- Cloud provider-key default maxply: 10, derived from local maxply / ratio
+- Local maxply cap: 50
+- Cloud maxply cap: 10
 - Default local/cloud maxply multiplier: 4x
 - Allowed local/cloud maxply multiplier range: 2x to 4x
 - CLI controls: `--local-maxplys=N`, `--local-cloud-maxply-ratio=N`
 
 ## Latest binary-published summary
 
-Source summary: `runs/aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_20260802_142954_summary.md`
+Source summary: `runs/aih_v4_pairwise_prototype_20260729/aichess_v4_pairwise_prototype_20260729_20260803_174442_summary.md`
 
-| Model | Mode | Termination | Completed game | Plies | Legal moves | Failed turns | Rejected attempts | Elapsed s |
-| --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: |
-| gemini:gemini-3.1-flash-lite vs gemini:gemini-3.1-flash-lite | aichess_hallucination_game | draw_by_configured_ply_limit | false | 20 | 20 | 0 | 0 | 33.213 |
+Rendered HTML:
+`data/aichess_v4_pairwise_prototype_20260729_20260803_174442.html`
+
+| Model | Mode | Result | Termination | Complete | Plies | Legal | Failed | Irrelevant | Rejected | Seconds |
+| --- | --- | --- | --- | --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| gmn-3.5-flash-lite v granite4:3b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.051 |
+| gmn-3.5-flash-lite v qwen2.5-coder:3b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.049 |
+| gmn-3.5-flash-lite v qwen2.5:0.5b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.414 |
+| gmn-3.5-flash-lite v qwen2.5 | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.052 |
+| gmn-3.5-flash-lite v qwen:4b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.434 |
+| gmn-3.5-flash-lite v smollm2:135m | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.412 |
+| gmn-3.5-flash-lite v gemma3:270m | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.206 |
+| gmn-3.5-flash-lite v llama3.2:1b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.046 |
+| gmn-3.5-flash-lite v gemma3:1b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.280 |
+| gmn-3.5-flash-lite v tinyllama | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.200 |
+| gmn-3.5-flash-lite v phi3:mini | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.278 |
+| gmn-3.5-flash-lite v mistral | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.209 |
+| gmn-3.5-flash-lite v llama3.2:3b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.241 |
+| gmn-3.5-flash-lite v gemma3:4b | ahg | fail.stp | b.fto | no | 1 | 1 | 0 | 0 | 0 | 61.210 |
 
 ## Preliminary interpretation
 
-The latest preliminary row is generated locally by successful
-`bin/aih_v4` runs from the newest v4 run summary.
+The latest preliminary table is generated from the newest successful
+`bin/aih_v4 --cloud-representative-gemini` run. Compact row values are display
+codes only; the JSONL keeps full field names and values.
