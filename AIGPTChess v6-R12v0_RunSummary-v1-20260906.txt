@@ -1,0 +1,1945 @@
+20260906
+R12 v0 Run Summary — working version v1
+
+# AIGPTChess v6 — R12 v0 Run Summary
+
+Evidence package:
+
+`gpt-aigptchess-v6-inventory-20260905_232900_MDT.zip`
+
+R12 v0 software package:
+
+`~/Downloads/gpt-r12-v0-aigptchess-v6-20260906_UTC/`
+
+Recorded run:
+
+`aigptchess-v6-inventory-20260905_232900_MDT`
+
+
+# 1. NAMED SOFTWARE COMPONENTS AND THEIR FUNCTIONS / ROLES
+
+Before evaluating any result, the software components involved in producing
+that result must be identified by name and by function.
+
+This distinction is important because several different components participate
+in a run, but they do not make the same kinds of decisions.
+
+
+## 1.1 START-R12-V0-AIGPTCHESS-V6.sh
+
+Software component:
+
+`START-R12-V0-AIGPTCHESS-V6.sh`
+
+Functional role:
+
+`R12 v0 launcher / entry point`
+
+Primary responsibilities:
+
+- starts the R12 v0 campaign;
+- establishes the top-level execution path;
+- invokes the R12 v0 campaign software.
+
+This component is primarily an entry point.
+
+It does not itself evaluate model semantics or chess-move correctness.
+
+
+## 1.2 runme-r12-v0-aigptchess-v6.sh
+
+Software component:
+
+`runme-r12-v0-aigptchess-v6.sh`
+
+Functional role:
+
+`R12 v0 campaign harness / campaign orchestrator`
+
+Primary responsibilities:
+
+- discovers the available GGUF models;
+- constructs the model inventory used for the run;
+- excludes non-playable auxiliary GGUF files;
+- invokes the R12 v0 qualification gate;
+- reads each model's qualification result;
+- admits only models whose qualification status is `PASS`;
+- invokes the per-model AIGPTChess v6 worker;
+- controls the campaign and clue-level execution;
+- collects and organizes run results.
+
+This component decides whether a model proceeds into the chess campaign by
+reading the result produced by the qualification gate.
+
+Its admission rule is effectively:
+
+`qualification status == PASS`
+
+It does NOT independently repeat the semantic qualification analysis.
+
+It therefore acts on the qualification decision made by another component.
+
+
+## 1.3 runme-r12-v0-qualification-gate.sh
+
+Software component:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Functional role:
+
+`R12 v0 qualification gate`
+
+Primary responsibilities:
+
+- starts a model using candidate communication profiles;
+- determines whether a usable communication profile exists;
+- sends the qualification prompts;
+- records model replies and response times;
+- performs semantic validation where applicable;
+- records qualification failures;
+- makes the final model-level qualification `PASS` or `FAIL` decision.
+
+This is the software component that made the disputed R12 v0 qualification
+decisions.
+
+
+### Qualification semantic validator
+
+Software implementation:
+
+Inline Bash decision logic inside:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Functional role:
+
+`R12 v0 qualification semantic validator`
+
+This is not a separate executable program.
+
+It is a distinct decision-making functionality inside the qualification gate.
+
+Its responsibilities are:
+
+- inspect model responses for selected qualification prompt types;
+- apply implemented Bash regular-expression acceptance rules;
+- apply implemented refusal/rejection rules where present;
+- set semantic success or semantic failure;
+- assign reason codes such as:
+
+`instruction_state_not_confirmed`
+
+`instruction_ack_not_confirmed`
+
+`state_report_not_confirmed`
+
+This functionality, rather than the language model, makes the decision that a
+reply is or is not semantically acceptable for qualification.
+
+
+## 1.4 aigptchess-v6-r12-v0-worker.sh
+
+Software component:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Functional role:
+
+`AIGPTChess v6 per-model chess worker / chess harness`
+
+Primary responsibilities:
+
+- starts an admitted model;
+- establishes model registration;
+- communicates with the chess controller / Stockfish side;
+- obtains the current chess position;
+- obtains legal moves;
+- obtains the Stockfish recommendation and analysis;
+- constructs the model's chess prompt;
+- sends the prompt through the model inference backend;
+- receives the raw model response;
+- validates exact UCI response format;
+- validates move legality;
+- performs the 3-attempt retry process;
+- records individual attempt classifications;
+- assigns the final chess-side termination classification.
+
+This component makes the chess-response acceptance or rejection decisions.
+
+It does NOT make the earlier R12 semantic qualification decision.
+
+
+## 1.5 controller_exchange()
+
+Named software functionality:
+
+`controller_exchange()`
+
+Location:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Functional role:
+
+`AIGPTChess v6 controller interface`
+
+Primary responsibilities include communication with the Stockfish side of the
+chess system.
+
+The controller side supplies information such as:
+
+- current FEN;
+- legal moves;
+- Stockfish best move;
+- Stockfish MultiPV analysis;
+- score information;
+- WDL information.
+
+The controller's role is therefore different from the model-output validator.
+
+The controller supplies chess-state and chess-analysis information.
+
+It does NOT decide whether:
+
+`Acknowledged.`
+
+is a valid qualification response.
+
+It also does NOT decide whether:
+
+`c6`
+
+matches the required complete UCI move format.
+
+Those decisions belong to other software roles.
+
+
+## 1.6 Stockfish 16
+
+Software component:
+
+`Stockfish 16`
+
+Location used by the run:
+
+`~/RPA2/devneutral/servers/stockfish/...`
+
+Functional role:
+
+`chess engine / controller-side chess-analysis engine`
+
+Primary responsibilities:
+
+- evaluates chess positions;
+- supplies legal-move information through the controller path;
+- supplies the recommended move used by the clue system;
+- supplies deeper analysis information used by the worker/controller.
+
+Stockfish does not judge natural-language qualification responses.
+
+Stockfish also does not assign R12 model-level qualification results.
+
+
+## 1.7 llama-server
+
+Software component:
+
+`llama-server`
+
+Location:
+
+`~/RPA2/devneutral/servers/llama.cpp/...`
+
+Software version used by this run:
+
+llama.cpp build 10729
+
+commit:
+
+`458681e1d`
+
+Functional role:
+
+`local model inference server / model transport backend`
+
+Primary responsibilities:
+
+- loads each GGUF model;
+- exposes the llama.cpp chat/inference interface;
+- receives requests generated by the R12/AIGPTChess software;
+- performs model inference;
+- returns generated model output.
+
+`llama-server` transports and generates model responses.
+
+It does not make the R12 semantic PASS/FAIL decision.
+
+It does not determine chess legality.
+
+
+## 1.8 GGUF language model
+
+Software/data component:
+
+`GGUF language model`
+
+Functional role:
+
+`language-model agent being evaluated`
+
+The model's responsibility is to generate a response to the prompt it receives.
+
+During qualification, the model produces responses such as:
+
+`Acknowledged.`
+
+or:
+
+`Ready to analyze a chess position.`
+
+During chess execution, it produces responses intended to be moves such as:
+
+`a2a3`
+
+The model does NOT:
+
+- grade its own qualification response;
+- decide whether it passed qualification;
+- decide whether its response matches R12's regex;
+- determine the harness's final classification;
+- determine whether the campaign continues.
+
+Those decisions are made by surrounding software.
+
+
+## 1.9 ChatGPT post-run analysis
+
+Analytical role:
+
+`ChatGPT post-run analysis`
+
+This is not part of the R12 v0 runtime software.
+
+My role begins after the run has completed.
+
+The present analysis examines:
+
+- the exact prompts;
+- the exact model replies;
+- the recorded decisions;
+- the decision reason codes;
+- the R12 v0 source code;
+- the qualification predicates;
+- the campaign logic;
+- the worker logic;
+- the chess results;
+- the run statistics.
+
+I did not participate in the original runtime decision path.
+
+When this report concludes that a runtime decision was correct, incorrect, too
+broad, or inconsistent with its apparent purpose, that is a separate post-run
+analytical judgment.
+
+
+# 2. DECISION-RESPONSIBILITY MAP
+
+The following responsibility map should be kept in mind throughout the rest of
+this report.
+
+Model generates text:
+
+`GGUF MODEL`
+
+Model inference and transport:
+
+`llama-server`
+
+Qualification prompt delivery and qualification decision:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Semantic qualification decision:
+
+`R12 v0 qualification semantic validator`
+
+inside:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision to admit a PASS model into the chess campaign:
+
+`runme-r12-v0-aigptchess-v6.sh`
+
+Chess campaign orchestration:
+
+`runme-r12-v0-aigptchess-v6.sh`
+
+Per-model chess execution:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Stockfish/controller communication:
+
+`controller_exchange()`
+
+inside:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Chess analysis:
+
+`Stockfish 16`
+
+Exact-UCI response validation:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Legal-move validation:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+using legal-move information obtained through the controller/Stockfish path.
+
+Final chess-side attempt/result classification:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Post-run evaluation of all of the above:
+
+`ChatGPT analysis`
+
+
+# 3. WHAT WE DID
+
+R12 v0 ran the relocated, locally controlled AIGPTChess environment against
+the discovered local GGUF model set.
+
+The run used:
+
+- neutral `llama-server`;
+- llama.cpp build 10729 / commit `458681e1d`;
+- Stockfish 16;
+- models primarily under `~/RPA2/devneutral/models`;
+- maximum game length of 100 ply;
+- clue ladder from 10 down to 0;
+- 3 attempts for each model chess response;
+- R12 v0 qualification before admission to AIGPTChess v6.
+
+The model-discovery phase found:
+
+`29 GGUF model entries`
+
+representing:
+
+`28 unique SHA-256 model contents`
+
+because OLMo2-1B appeared at 2 locations with identical model content.
+
+The discovery logic also excluded 19 auxiliary/non-playable GGUF artifacts.
+
+Qualification completed without campaign-level failure:
+
+`r12-v0-qualification_exit=0`
+
+
+# 4. HOW R12 v0 QUALIFICATION ACTUALLY WORKS
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Before the five qualification prompt types, R12 tries communication profiles
+in this order:
+
+`small`
+
+`standard`
+
+`large`
+
+A profile is selected when the model produces a nonempty response.
+
+If none of the profiles produces a usable response, the qualification gate
+rejects the model as:
+
+`profile_no_response`
+
+Once a communication profile has been selected, R12 defines five prompt types:
+
+1. `open_response`
+2. `instruction_state`
+3. `instruction_ack`
+4. `state_report`
+5. `identity_report`
+
+Each is nominally scheduled for 3 repeats.
+
+Maximum complete qualification workload:
+
+`5 prompts x 3 repeats = 15 responses per model`
+
+However, the qualification gate uses immediate rejection.
+
+The first:
+
+- empty response;
+- failed request; or
+- semantic failure
+
+can terminate the remaining qualification work for that model.
+
+
+# 5. EXACT QUALIFICATION SEMANTIC RULES
+
+Decision-maker:
+
+`R12 v0 qualification semantic validator`
+
+Software location:
+
+`runme-r12-v0-qualification-gate.sh`
+
+The semantic validator begins each applicable evaluation with:
+
+`semantic_ok=1`
+
+`open_response` and `identity_report` therefore receive no additional semantic
+content test.
+
+A nonempty response is sufficient for that portion of those prompt types.
+
+Three prompt types receive explicit semantic validation.
+
+
+## instruction_state
+
+Implemented acceptance rule:
+
+The response must contain, case-sensitively, at least one of:
+
+`ready`
+
+`prepared`
+
+`able`
+
+`can`
+
+AND at least one of:
+
+`chess`
+
+`position`
+
+`analy[sz]`
+
+Implemented rejection rule:
+
+Reject when either required positive pattern is absent.
+
+There is no refusal check in the `instruction_state` semantic branch.
+
+
+## instruction_ack
+
+Implemented acceptance rule:
+
+The response must NOT match the implemented refusal expression.
+
+It must also contain, case-sensitively, at least one acknowledgement form,
+including:
+
+`acknowledge`
+
+`acknowledged`
+
+`received`
+
+`understood`
+
+`got it`
+
+`okay`
+
+or the implemented forms corresponding to:
+
+`ok`
+
+and:
+
+`yes`
+
+Implemented rejection rule:
+
+Reject if:
+
+- the refusal expression matches; OR
+- no acknowledgement expression matches.
+
+
+## state_report
+
+Implemented acceptance rule:
+
+The response must NOT match the refusal expression.
+
+It must contain, case-sensitively, at least one of:
+
+`ready`
+
+`prepared`
+
+`able`
+
+`can`
+
+AND at least one of:
+
+`chess`
+
+`position`
+
+`analy[sz]`
+
+`process`
+
+Implemented rejection rule:
+
+Reject if:
+
+- the refusal expression matches; OR
+- either required positive expression fails to match.
+
+
+## Case-handling behavior
+
+The qualification gate uses Bash:
+
+`[[ string =~ regex ]]`
+
+The qualification source does NOT normalize the response to lowercase before
+these semantic tests.
+
+It also does not enable case-insensitive Bash regex matching.
+
+The semantic qualification tests are therefore case-sensitive.
+
+This implementation property is central to several of the recorded R12 v0
+qualification failures.
+
+
+# 6. QUALIFICATION RESULTS
+
+Models/model entries tested:
+
+`29`
+
+Final model-level qualification results:
+
+- PASS: 6
+- FAIL: 23
+
+Percentages:
+
+- PASS: 20.7%
+- FAIL: 79.3%
+
+Recorded failure reasons:
+
+- 11 `semantic_failure_instruction_ack`
+- 6 `profile_no_response`
+- 3 `semantic_failure_instruction_state`
+- 2 `semantic_failure_state_report`
+- 1 `empty_response`
+
+No qualification response was classified:
+
+`SLOW`
+
+
+# 7. QUALIFICATION DECISION EXAMPLES
+
+Each example below is organized in this order:
+
+1. prompt;
+2. model response;
+3. software role making the decision;
+4. implemented acceptance criterion;
+5. implemented rejection criterion;
+6. recorded runtime decision;
+7. ChatGPT post-run evaluation.
+
+This ordering is intentional.
+
+The runtime software decision is presented before that decision is criticized
+or defended.
+
+
+## OLMo2
+
+Prompt type:
+
+`instruction_state`
+
+System prompt:
+
+`Respond briefly and clearly to the user.`
+
+User prompt:
+
+`State in one short sentence that you are ready to analyze a chess position.`
+
+Model response:
+
+`Ready to analyze a chess position.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Implemented acceptance criterion:
+
+The response must contain, case-sensitively:
+
+`ready|prepared|able|can`
+
+AND:
+
+`chess|position|analy[sz]`
+
+Implemented rejection criterion:
+
+Reject when either required expression fails to match.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_state_not_confirmed`
+
+ChatGPT post-run analysis:
+
+The response follows the natural-language request almost verbatim.
+
+The response contains:
+
+`Ready`
+
+while the positive expression searches for lowercase:
+
+`ready`
+
+The response therefore fails the implemented case-sensitive regex even though
+its semantic content satisfies the prompt.
+
+If case alone is normalized, this response passes the otherwise unchanged
+positive test.
+
+The duplicate OLMo2 model entry produced the same outcome.
+
+
+## Qwen2.5
+
+Prompt type:
+
+`instruction_ack`
+
+System prompt:
+
+`Respond briefly and clearly to the user.`
+
+User prompt:
+
+`Reply with a brief acknowledgement that you received this chess-analysis`
+`prompt.`
+
+Model response:
+
+`Acknowledged.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Implemented acceptance criterion:
+
+No recognized refusal AND a matching case-sensitive acknowledgement form.
+
+The implemented acknowledgement alternatives include:
+
+`acknowledged`
+
+Implemented rejection criterion:
+
+Reject when:
+
+- a refusal matches; OR
+- no acknowledgement alternative matches.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_ack_not_confirmed`
+
+ChatGPT post-run analysis:
+
+`Acknowledged.` directly performs the requested acknowledgement.
+
+The implemented expression searches for lowercase:
+
+`acknowledged`
+
+The response begins with capitalized:
+
+`Acknowledged`
+
+The response therefore fails because of the validator's case handling.
+
+
+## Qwen2.5-Coder
+
+Prompt type:
+
+`instruction_ack`
+
+System prompt:
+
+`Respond briefly and clearly to the user.`
+
+User prompt:
+
+`Reply with a brief acknowledgement that you received this chess-analysis`
+`prompt.`
+
+Model response:
+
+`Acknowledged.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Acceptance criterion:
+
+No refusal AND a matching acknowledgement expression.
+
+Rejection criterion:
+
+Refusal OR failure to match an acknowledgement expression.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_ack_not_confirmed`
+
+ChatGPT post-run analysis:
+
+The model supplied exactly the type of reply requested.
+
+Capitalization prevents the implemented lowercase expression from matching.
+
+
+## Granite4
+
+Prompt type:
+
+`instruction_ack`
+
+User prompt:
+
+`Reply with a brief acknowledgement that you received this chess-analysis`
+`prompt.`
+
+Model response:
+
+`Acknowledged.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Acceptance criterion:
+
+No refusal AND a case-sensitive acknowledgement match.
+
+Rejection criterion:
+
+Refusal OR no acknowledgement match.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_ack_not_confirmed`
+
+ChatGPT post-run analysis:
+
+Again, the semantic intent of the response matches the semantic intent of the
+prompt.
+
+The implemented case-sensitive lexical test does not recognize the capitalized
+form.
+
+
+## Danube3-4B
+
+Prompt type:
+
+`instruction_ack`
+
+User prompt:
+
+`Reply with a brief acknowledgement that you received this chess-analysis`
+`prompt.`
+
+Model response:
+
+`Received.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Acceptance criterion:
+
+No refusal AND a case-sensitive acknowledgement match, including:
+
+`received`
+
+Rejection criterion:
+
+Refusal OR no acknowledgement match.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_ack_not_confirmed`
+
+ChatGPT post-run analysis:
+
+`Received.` is a direct acknowledgement of receipt.
+
+The validator searches for lowercase:
+
+`received`
+
+The capitalized response therefore fails the implemented case-sensitive rule.
+
+
+## Nemotron
+
+Prompt type:
+
+`instruction_ack`
+
+Model response:
+
+`Acknowledged.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Acceptance criterion:
+
+No refusal AND a case-sensitive acknowledgement match.
+
+Rejection criterion:
+
+Refusal OR no acknowledgement match.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_ack_not_confirmed`
+
+ChatGPT post-run analysis:
+
+The model performed the requested acknowledgement.
+
+The implemented validator failed to recognize it because of capitalization.
+
+
+## Ministral
+
+Prompt type:
+
+`instruction_ack`
+
+User prompt:
+
+`Reply with a brief acknowledgement that you received this chess-analysis`
+`prompt.`
+
+Model response:
+
+`Understood! Proceeding with your chess analysis request.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Acceptance criterion:
+
+No refusal AND a case-sensitive acknowledgement expression, including:
+
+`understood`
+
+Rejection criterion:
+
+Refusal OR no acknowledgement expression match.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_ack_not_confirmed`
+
+ChatGPT post-run analysis:
+
+The response explicitly communicates understanding of the request.
+
+The implementation searches for lowercase:
+
+`understood`
+
+while the reply contains:
+
+`Understood`
+
+The otherwise appropriate response therefore fails the case-sensitive match.
+
+
+## Second Qwen2.5 model entry
+
+Prompt type:
+
+`instruction_ack`
+
+User prompt:
+
+`Reply with a brief acknowledgement that you received this chess-analysis`
+`prompt.`
+
+Model response:
+
+`Received your chess-analysis prompt.`
+
+Decision-making software:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Decision-making functionality:
+
+`R12 v0 qualification semantic validator`
+
+Acceptance criterion:
+
+No refusal AND a case-sensitive acknowledgement form, including:
+
+`received`
+
+Rejection criterion:
+
+Refusal OR no acknowledgement match.
+
+Recorded runtime decision:
+
+`SEMANTIC_FAIL`
+
+Recorded reason:
+
+`instruction_ack_not_confirmed`
+
+ChatGPT post-run analysis:
+
+This response very nearly restates the requested action.
+
+Again:
+
+`Received`
+
+does not match lowercase:
+
+`received`
+
+under the implemented case-sensitive rule.
+
+
+# 8. STATISTICS ON QUALIFICATION DECISIONS
+
+Total rejected model entries:
+
+`23`
+
+Semantic-validator rejections:
+
+`16`
+
+Semantic rejections therefore account for:
+
+`16 / 23 = 69.6%`
+
+of rejected model entries.
+
+They represent:
+
+`16 / 29 = 55.2%`
+
+of the entire tested model-entry population.
+
+
+## Semantic-failure distribution
+
+`instruction_ack`
+
+- 11 semantic failures
+- 68.8% of semantic failures
+- 47.8% of all rejected entries
+- 37.9% of the complete tested population
+
+`instruction_state`
+
+- 3 semantic failures
+- 18.8% of semantic failures
+- 13.0% of rejected entries
+- 10.3% of the complete tested population
+
+`state_report`
+
+- 2 semantic failures
+- 12.5% of semantic failures
+- 8.7% of rejected entries
+- 6.9% of the complete tested population
+
+
+## Case-sensitivity effect
+
+Reapplying the implemented semantic concepts while changing only the matching
+to case-insensitive causes:
+
+`11 of the 16 semantic failures`
+
+to become semantic passes.
+
+That is:
+
+`68.8% of semantic failures`
+
+and:
+
+`47.8% of all rejected model entries`
+
+No model response has to be rewritten for those 11 cases.
+
+No additional semantic vocabulary is required.
+
+The principal changed variable is capitalization handling.
+
+
+## Additional lexical false negative
+
+One Llama 3.2 state-report response stated:
+
+`I'm in a state of readiness to process a chess-analysis request.`
+
+The implemented expression searches for:
+
+`ready`
+
+It does not include:
+
+`readiness`
+
+Because `readiness` does not contain the literal sequence `ready`, that
+response fails the lexical test.
+
+This is a separate problem from capitalization.
+
+Combining that example with the 11 capitalization cases gives at least:
+
+`12 of 16 semantic failures = 75.0%`
+
+where the ordinary meaning of the model response appears to satisfy the prompt
+but the implemented lexical test fails to recognize it.
+
+That also represents:
+
+`12 of 23 rejected model entries = 52.2%`
+
+
+# 9. PROMPT / RESPONSE STATISTICS
+
+The qualification sequence progressively narrows because a model can be
+terminated at its first failure.
+
+
+## open_response
+
+Recorded TIMELY responses:
+
+`69`
+
+These correspond to 23 models completing three open-response probes.
+
+
+## instruction_state
+
+Recorded:
+
+- 57 TIMELY
+- 3 SEMANTIC_FAIL
+
+There was also an empty-response failure represented in the gate information.
+
+
+## instruction_ack
+
+Recorded:
+
+- 24 TIMELY
+- 11 SEMANTIC_FAIL
+
+The acknowledgement stage generated the largest number of semantic
+rejections.
+
+
+## state_report
+
+Recorded:
+
+- 18 TIMELY
+- 2 SEMANTIC_FAIL
+
+
+## identity_report
+
+Recorded:
+
+`18 TIMELY`
+
+Only the surviving models reached all three identity-report repeats.
+
+There is no separate content-semantic validator for `identity_report`.
+
+
+# 10. IMPORTANT PROPERTIES OF THE QUALIFICATION SOFTWARE
+
+The qualification gate has several independent implementation properties.
+
+
+## Case-sensitive positive matching
+
+This produces the mechanically identifiable capitalization failures described
+above.
+
+
+## Case-sensitive refusal matching
+
+The refusal expression is subject to the same case-sensitive Bash behavior.
+
+
+## No refusal check in instruction_state
+
+`instruction_ack` and `state_report` explicitly test refusal language.
+
+`instruction_state` does not.
+
+This creates a potential false-positive path in addition to the observed
+false-negative path.
+
+
+## Narrow lexical matching
+
+Semantically related forms such as:
+
+`readiness`
+
+are not necessarily recognized by expressions built around:
+
+`ready`
+
+
+## Immediate rejection
+
+The first semantic failure terminates qualification for that model.
+
+Therefore the nominal 3-repeat structure does not protect a model from a
+single semantic-classifier false negative.
+
+
+## SLOW is not automatically FAIL
+
+A nonempty response beyond the configured response threshold can be recorded:
+
+`SLOW`
+
+without itself causing model failure.
+
+No SLOW qualification responses occurred in this run.
+
+
+# 11. WHAT THE QUALIFICATION RESULT ACTUALLY MEANS
+
+The historical R12 v0 runtime result was:
+
+`6 PASS / 23 FAIL`
+
+That result should be preserved.
+
+However, its proper interpretation is:
+
+`6 model entries passed the R12 v0 qualification implementation as written.`
+
+It should NOT automatically be interpreted as:
+
+`only 6 model entries were functionally capable of performing the requested`
+`tasks.`
+
+The result reflects a combination of:
+
+- model behavior;
+- inference/transport behavior;
+- communication-profile behavior;
+- actual model failures;
+- qualification-gate rules;
+- qualification semantic-validator implementation behavior.
+
+
+# 12. MODELS ADMITTED TO AIGPTChess v6
+
+Decision-making software:
+
+`runme-r12-v0-aigptchess-v6.sh`
+
+Admission criterion:
+
+`qualification status == PASS`
+
+Six models entered the chess campaign:
+
+1. SmolLM2
+2. Phi-3
+3. Qwen SHA `46bb6520...`
+4. Phi-4 Mini
+5. Apriel-5B-Instruct
+6. Mistral SHA `f5074b12...`
+
+The campaign harness did not independently reconsider qualification replies.
+
+It consumed the PASS/FAIL result produced by:
+
+`runme-r12-v0-qualification-gate.sh`
+
+
+# 13. HOW THE CHESS-SIDE DECISION WORKS
+
+Primary chess execution software:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Controller interface:
+
+`controller_exchange()`
+
+Chess-analysis engine:
+
+`Stockfish 16`
+
+Model inference backend:
+
+`llama-server`
+
+Model being evaluated:
+
+`GGUF model`
+
+
+## Chess model system prompt
+
+`You are the AIGPTChess v6 chess agent playing White. Follow the move request`
+`exactly. Do not explain your answer.`
+
+
+## Required output
+
+The chess request requires exactly one UCI move matching:
+
+`[a-h][1-8][a-h][1-8][qrbn]?`
+
+and nothing else.
+
+
+## Chess response decision-maker
+
+Decision-making software:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Functional role:
+
+`chess response validator / worker`
+
+
+## Exact-format acceptance criterion
+
+The worker normalizes the model response and requires the entire reply to
+match:
+
+`^[a-h][1-8][a-h][1-8][qrbn]?$`
+
+
+## Legality acceptance criterion
+
+If the syntax is valid, the resulting UCI move must also appear in the legal
+move list obtained through the controller/Stockfish side.
+
+
+## Rejection categories
+
+No usable model response can produce:
+
+`NO_REPLY`
+
+A nonempty response with incorrect syntax can produce:
+
+`INVALID_REPLY_FORMAT`
+
+A syntactically valid but illegal move can produce:
+
+`INVALID_REPLY_LEGALITY`
+
+
+## Retry behavior
+
+The worker permits 3 attempts.
+
+Timeout and token allowances rise between attempts.
+
+The essential chess request remains the same.
+
+
+## Final classification
+
+After 3 invalid replies, the worker can produce:
+
+`MODEL_COMMUNICATION_LOSS`
+
+with termination reason:
+
+`model_invalid_reply_after_3_attempts`
+
+This final classification is made by:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+It is NOT made by:
+
+- the model;
+- Stockfish;
+- the qualification gate;
+- ChatGPT post-run analysis.
+
+
+# 14. CHESS RESULTS UNDER THOSE RULES
+
+All 6 admitted models eventually received:
+
+`MODEL_COMMUNICATION_LOSS`
+
+with:
+
+`model_invalid_reply_after_3_attempts`
+
+The raw responses show several different underlying causes.
+
+
+## SmolLM2
+
+Model behavior:
+
+The response began reproducing prompt material instead of returning one UCI
+move.
+
+Decision-making software:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Runtime decision:
+
+`INVALID_REPLY_FORMAT`
+
+ChatGPT post-run evaluation:
+
+The decision follows the documented exact-UCI criterion.
+
+Completed ply:
+
+`0`
+
+
+## Phi-3
+
+Stockfish recommendation:
+
+`a2a3`
+
+Model response:
+
+`a2`
+
+Decision-maker:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Runtime decision:
+
+`INVALID_REPLY_FORMAT`
+
+ChatGPT post-run evaluation:
+
+The response contains only the source square.
+
+It does not satisfy the required complete-UCI syntax.
+
+Completed ply:
+
+`0`
+
+
+## Phi-4 Mini
+
+Stockfish recommendation:
+
+`a2a3`
+
+Model response:
+
+`a3`
+
+Decision-maker:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Runtime decision:
+
+`INVALID_REPLY_FORMAT`
+
+ChatGPT post-run evaluation:
+
+The response contains only the destination square.
+
+The rejection follows the stated UCI rule.
+
+Completed ply:
+
+`0`
+
+
+## Apriel-5B
+
+Model response:
+
+`a2a3`
+`<|end|>`
+
+Decision-maker:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Acceptance rule:
+
+The entire normalized response must contain one UCI move and nothing else.
+
+Runtime decision:
+
+`INVALID_REPLY_FORMAT`
+
+ChatGPT post-run evaluation:
+
+The rejection is technically consistent with the implemented exact-output
+rule.
+
+However, the model did generate the correct move:
+
+`a2a3`
+
+The failure arose because an additional chat-template terminator was emitted.
+
+That is analytically different from failing to generate a complete move.
+
+
+## Qwen SHA 46bb6520...
+
+Completed ply before failure:
+
+`10`
+
+Valid model moves:
+
+`5`
+
+Clue-following accepted moves:
+
+`5 / 5`
+
+At ply 11, Stockfish recommended:
+
+`f2f3`
+
+The model returned:
+
+`f2`
+
+on all 3 attempts.
+
+Decision-maker:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Attempt decision:
+
+`INVALID_REPLY_FORMAT`
+
+Final worker classification:
+
+`MODEL_COMMUNICATION_LOSS`
+
+Termination reason:
+
+`model_invalid_reply_after_3_attempts`
+
+ChatGPT post-run evaluation:
+
+Rejecting `f2` as an exact UCI move is correct under the implemented rule.
+
+The broader final label:
+
+`MODEL_COMMUNICATION_LOSS`
+
+is less precise because the model actually communicated on all 3 attempts.
+
+
+## Mistral SHA f5074b12...
+
+Completed ply:
+
+`42`
+
+Accepted model moves:
+
+`21`
+
+Accepted model moves following the clue-10 Stockfish recommendation:
+
+`21 / 21`
+
+At ply 43, Stockfish recommended:
+
+`c5c6`
+
+The model returned:
+
+`c6`
+
+on all 3 attempts.
+
+Decision-maker:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Attempt decision:
+
+`INVALID_REPLY_FORMAT`
+
+Final worker classification:
+
+`MODEL_COMMUNICATION_LOSS`
+
+Termination reason:
+
+`model_invalid_reply_after_3_attempts`
+
+ChatGPT post-run evaluation:
+
+Rejecting `c6` under the exact-UCI criterion is correct.
+
+Calling the resulting condition:
+
+`MODEL_COMMUNICATION_LOSS`
+
+is substantially broader than the actual event.
+
+The model communicated.
+
+Its response format was invalid.
+
+
+# 15. RETRY BEHAVIOR
+
+The 3-attempt mechanism does not correct many deterministic formatting errors.
+
+Examples include:
+
+`f2`
+`f2`
+`f2`
+
+and:
+
+`c6`
+`c6`
+`c6`
+
+Increasing timeout or token limits does not address that failure mechanism.
+
+Future retry policy should distinguish:
+
+- no response;
+- delayed response;
+- truncated response;
+- malformed response;
+- deterministic malformed response.
+
+That would allow different recovery actions for different failure mechanisms.
+
+
+# 16. HOST / RESOURCE RESULTS
+
+All 6 models entering the chess stage recorded:
+
+`responsiveness.automated = PASS`
+
+Mistral reached 42 ply while the host remained usable under the automated
+responsiveness measurement.
+
+Approximate Mistral observations included:
+
+- peak llama-server RSS around 5.7 GiB;
+- minimum available RAM around 2.0 GiB;
+- substantial swap use;
+- automated responsiveness PASS;
+- maximum scheduler delay around 4 seconds.
+
+This differs materially from the earlier Qwen3.8-27B experience, where model
+size itself became a host-deployment problem.
+
+
+# 17. OVERALL CONCLUSIONS
+
+R12 v0 demonstrated that the relocated local architecture can:
+
+1. discover models;
+2. exclude auxiliary GGUF artifacts;
+3. load models through neutral llama.cpp;
+4. perform qualification;
+5. pass qualification results into the campaign harness;
+6. register admitted models;
+7. communicate with Stockfish;
+8. obtain legal-move and analysis information;
+9. prompt models with chess positions and clues;
+10. advance actual chess games.
+
+It also revealed separate qualification and chess-side issues.
+
+
+## Qualification issue
+
+Decision-maker:
+
+`R12 v0 qualification semantic validator`
+
+inside:
+
+`runme-r12-v0-qualification-gate.sh`
+
+Observed problem:
+
+The implemented semantic rules use narrow, case-sensitive lexical matching.
+
+At least:
+
+`11 / 16`
+
+semantic failures change to passes if case handling alone is normalized.
+
+At least one additional response demonstrates a lexical-form limitation:
+
+`readiness`
+
+versus:
+
+`ready`
+
+
+## Chess-side issue
+
+Decision-maker:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+Observed result:
+
+The individual exact-UCI rejection decisions generally follow the stated
+syntax rule.
+
+The principal classification problem appears later, when repeated invalid
+responses are collapsed into:
+
+`MODEL_COMMUNICATION_LOSS`
+
+even when communication actually occurred.
+
+
+# 18. BOTTOM LINE
+
+The run does NOT establish:
+
+`only 6 of the 29 tested model entries work.`
+
+It establishes:
+
+`6 model entries passed the R12 v0 qualification implementation as written.`
+
+Those are not equivalent statements.
+
+Likewise, the chess run does NOT establish:
+
+`all 6 admitted models stopped communicating.`
+
+It establishes:
+
+`all 6 eventually produced 3 consecutive responses rejected by the worker.`
+
+The strongest positive chess result was Mistral:
+
+- 42 completed ply;
+- 21 accepted model moves;
+- 21/21 accepted moves followed the clue-10 Stockfish recommendation;
+- automated host responsiveness remained PASS;
+- the eventual response was `c6` where full UCI `c5c6` was required.
+
+This remains strong evidence that the basic model / inference-server /
+controller / Stockfish / worker / campaign architecture is operational.
+
+
+# 19. NEXT R12 REVISION PRIORITIES
+
+1. Normalize qualification semantic matching for capitalization.
+
+2. Review lexical acceptance coverage such as `ready` versus `readiness`.
+
+3. Apply refusal detection consistently where appropriate.
+
+4. Reconsider immediate termination after one semantic failure.
+
+5. Preserve distinct qualification classifications for:
+   - transport failure;
+   - no response;
+   - empty response;
+   - semantic failure;
+   - slow response.
+
+6. Preserve distinct chess classifications for:
+   - no reply;
+   - invalid UCI format;
+   - illegal move;
+   - mixed communication failure;
+   - resource failure.
+
+7. Keep software-component responsibility explicit in every analysis.
+
+8. Preserve the exact prompt, exact model response, decision-maker,
+   acceptance rule, rejection rule, and recorded result at each important
+   decision point.
+
+9. Keep model behavior, controller behavior, harness behavior, qualification
+   behavior, and post-run analysis as separate evidentiary layers.
+
+
+# 20. SOFTWARE BASELINE WORK IN PROGRESS
+
+The next project step is to build a complete first-party Software Library
+Collection for the R12 v0 / AIGPTChess v6 software used and discussed here.
+
+The collection will:
+
+- exclude third-party binaries and third-party model files;
+- preserve our first-party source files byte-for-byte;
+- identify every included component by name;
+- identify every included component by version;
+- identify every included component by function/role;
+- include provenance and SHA-256 hashes;
+- include a collection-level name;
+- include a collection-level version;
+- include a collection build date/time;
+- be stored for the user under `~/Downloads`;
+- become the explicit software baseline referenced by the final
+  R12 v0 Run Summary dated `20260906 1500MT`.
+
+Current source-baseline finding:
+
+The R12 v0 package's active v6 implementation is the packaged:
+
+`aigptchess-v6-r12-v0-worker.sh`
+
+The package does not call an older external AIGPTChess v6 script tree for
+runtime execution. The external AIGPTChess v6 directory is used for run/result
+storage.
+
+Third-party components such as:
+
+- llama.cpp / llama-server;
+- Stockfish;
+- GGUF model files
+
+will be identified by version where relevant to the run summary, but excluded
+from the first-party Software Library Collection.
