@@ -2,6 +2,11 @@
 aigptchessplay v1r4e faults
 ChatGPT analysis of first run
 
+This analysis by GPT is ultimately an example of the scope of AIH. 
+From project definition through implementation into analysis. 
+
+..........................................................................
+
 The main problem with AIGPTChessPlay v1r4e is not llama.cpp
 communication or streaming. The run actually established that those
 parts are working. I see 3 real defects/unfinished areas, with the first
